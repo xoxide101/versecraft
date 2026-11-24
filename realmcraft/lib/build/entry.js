@@ -8,4 +8,5 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
-window.THREE = Object.assign({}, T, { GLTFLoader, BufferGeometryUtils, EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, OutputPass, Sky });
+import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
+window.THREE = Object.assign({}, T, { GLTFLoader, BufferGeometryUtils, EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, OutputPass, Sky, HDRLoader });

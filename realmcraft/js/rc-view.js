@@ -14,7 +14,7 @@
       this.T = THREE; this.realm = realm; this.sim = sim;
       const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }));
       r.setPixelRatio(Math.min(devicePixelRatio, RC.quality.pixelRatio)); r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
-      r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.05; r.outputColorSpace = THREE.SRGBColorSpace;
+      r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 0.95; r.outputColorSpace = THREE.SRGBColorSpace;
       host.append(r.domElement); this.canvas = r.domElement;
       this.scene = new THREE.Scene(); this.scene.fog = new THREE.Fog('#9fd0ff', 60, 150);
       this.camera = new THREE.PerspectiveCamera(32, 1, 0.1, 900);
@@ -49,6 +49,10 @@
         }
       }
       this.initWeather();
+      // real photographed skies light the scene and show in reflections; one per mood (day, sunset, dusk, overcast, night)
+      this.envs = {}; this.envMood = null;
+      if (window.RC_SKY) { const pm = new THREE.PMREMGenerator(r), L = new THREE.HDRLoader();
+        for (const [mood, d] of Object.entries(window.RC_SKY)) L.load('data:application/octet-stream;base64,' + d.hdr, (tx) => { tx.mapping = THREE.EquirectangularReflectionMapping; this.envs[mood] = pm.fromEquirectangular(tx).texture; tx.dispose(); this.envMood = null; }); }
       RC.weatherize(this.scene, this.shared);   // rain and snow lie on things (rc-weathering.js)
       this.cam = { x: sim.players[0].x, y: 0, z: sim.players[0].z, dist: 26.5, elev: 0.64, look: 0.35, init: false };
       this.ray = new THREE.Raycaster(); this.faded = new Set();
@@ -95,7 +99,11 @@
       this.stars.material.opacity = RC.clamp((0.05 - sunUp) * 4, 0, 1) * (1 - grey);
       this.night = RC.clamp(1 - (sunI - 0.1) / 0.8, 0, 1);
       const sa = (f - 0.25) * Math.PI * 2;   // sun's path: rises in the east at dawn
-      this.sun.intensity = sunI; this.hemi.intensity = amb; this.sun.color.set(f < 0.3 || f > 0.75 ? '#ffc58a' : '#fff4e0');
+      // which real sky lights the scene: weather first, then the time of day
+      const mood = grey > 0.25 ? 'overcast' : this.night > 0.75 ? 'night' : f < 0.3 ? 'sunset' : f > 0.8 ? 'dusk' : f > 0.73 ? 'sunset' : 'day';
+      if (mood !== this.envMood && this.envs[mood]) { this.envMood = mood; this.scene.environment = this.envs[mood]; }
+      const hasEnv = !!this.scene.environment; this.scene.environmentIntensity = hasEnv ? RC.lerp(0.12, 0.5, RC.clamp(sunI / 1.8, 0, 1)) * (1 - grey * 0.25) : 0;   // (the sky's light follows the sun's strength: warm and low at sunset, faint at night)
+      this.sun.intensity = sunI; this.hemi.intensity = hasEnv ? amb * 0.35 : amb; this.sun.color.set(f < 0.3 || f > 0.75 ? '#ffc58a' : '#fff4e0');
       // ---- camera
       const v = VIEWS[sim.viewMode] || VIEWS.evo, talk = sim.dialogue && sim.dialogue.who;
       let tx = pl.x, tz = pl.z, dist = v.dist, elev = v.elev, lookY = 0.35;
