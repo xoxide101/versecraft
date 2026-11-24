@@ -364,15 +364,16 @@
             const pil = cyl(0.045, 0.05, 0.42, stone, 8, Math.cos(a + 0.157) * 1.8, 0.12, Math.sin(a + 0.157) * 1.8); o.add(pil); }
           for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + 0.2; o.add(cyl(0.1, 0.12, 0.1, stone, 10, Math.cos(a) * 1.74, 0.62, Math.sin(a) * 1.74)); const b = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), stone); b.position.set(Math.cos(a) * 1.74, 0.82, Math.sin(a) * 1.74); b.castShadow = true; o.add(b); }
           for (let i = 0; i < 14; i++) { const a = RC.hash(i, 3, 61) * 6.28, m2 = new THREE.Mesh(new THREE.SphereGeometry(0.1 + RC.hash(i, 4, 61) * 0.08, 8, 5, 0, 6.3, 0, 1.6), moss); m2.scale.y = 0.45; m2.position.set(Math.cos(a) * 1.86, 0.1 + RC.hash(i, 5, 61) * 0.45, Math.sin(a) * 1.86); o.add(m2); }   // moss where the water runs down the stone
-          const water = new THREE.MeshStandardMaterial({ color: '#4fa9de', roughness: 0.04, metalness: 0.15, transparent: true, opacity: 0.82, envMapIntensity: 1.6 });
-          const w1 = cyl(1.58, 1.58, 0.02, water, 40, 0, 0.46), w2 = cyl(0.84, 0.84, 0.02, water, 32, 0, 1.42); o.add(w1, w2);
+          const water = new THREE.MeshStandardMaterial({ color: '#e8f2f4', roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.55 });   // (spray)
+          const w1 = new THREE.Mesh(new THREE.CircleGeometry(1.58, 48).rotateX(-Math.PI / 2), PR.poolWater(1.22)); w1.position.y = 0.47; const w2 = new THREE.Mesh(new THREE.CircleGeometry(0.84, 40).rotateX(-Math.PI / 2), PR.poolWater(0.45)); w2.position.y = 1.43; o.add(w1, w2);
+          o.add(PR.veil(1.0, 1.62, 1.24, 0.48)); o.add(PR.veil(0.5, 2.08, 0.62, 1.44));   // water falling from each bowl's lip into the one below
           for (const [r, h] of [[0.34, 0.16], [0.3, 0.6], [0.26, 1.0]]) o.add(cyl(r, r - 0.03, h, stone, 14, 0, r === 0.34 ? 0.16 : r === 0.3 ? 0.32 : 0.92));
           for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; o.add(cyl(0.028, 0.028, 0.95, stone, 6, Math.cos(a) * 0.255, 0.4, Math.sin(a) * 0.255)); }   // the fluted column
           for (const y of [0.34, 0.9]) { const tr = new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.045, 8, 20), stone); tr.rotation.x = Math.PI / 2; tr.position.y = y; o.add(tr); }
           o.add(lathe([[0, 0], [0.6, 0], [0.62, 0.12], [0.98, 0.36], [1.0, 0.44], [0.92, 0.44], [0.9, 0.38], [0.56, 0.18], [0, 0.18]], 36, stone, 1.2 - 0.0));   // the second, wider bowl on a scalloped lip
           o.add(cyl(0.2, 0.26, 0.5, stone, 12, 0, 1.38)); o.add(lathe([[0, 0], [0.3, 0], [0.5, 0.2], [0.46, 0.22], [0.28, 0.08], [0, 0.08]], 24, stone, 1.9));
           const urn = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 10), stone); urn.position.y = 2.18; urn.scale.y = 1.25; urn.castShadow = true; o.add(urn); o.add(cyl(0.03, 0.05, 0.22, stone, 8, 0, 2.3));
-          const N = 90, dm = new THREE.InstancedMesh(new THREE.SphereGeometry(0.028, 6, 5), water, N), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(1, 1, 1);
+          const N = 60, dm = new THREE.InstancedMesh(new THREE.SphereGeometry(0.016, 5, 4), water, N), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(1, 1, 1);
           tickers.push((tm) => { for (let i = 0; i < N; i++) { const grp = i % 3, ph = (tm * (0.55 + grp * 0.08) + i * 0.137) % 1, a = i * 2.399;
               let r, y;   // 0: jets arching from the top into the upper bowl; 1: spill off the bowl's lip into the basin; 2: a thin veil off the lowest bowl
               if (grp === 0) { r = ph * 0.62; y = 2.5 + 0.9 * ph - 3.4 * ph * ph + 0.0; y = Math.max(y, 1.44); } else if (grp === 1) { r = 0.95 + ph * 0.3; y = 1.6 - ph * ph * 1.15; } else { r = 0.45 + ph * 0.22; y = 1.95 - ph * ph * 0.9; y = Math.max(y, 1.44); }
@@ -406,14 +407,14 @@
           const others = realm.things.filter((o) => o.kind === 'noticeboard' && o !== t).flatMap((o) => o.lines || []);
           const back = { title: 'WORK · LOST & FOUND · NEWS', lines: others.slice(0, 4).concat(['LOST: a grey cat, answers to Pip. Bring her to the Herbalist for a reward.', 'MARKET every Saturday on the plaza, from first light.']).slice(0, 6) };
           return RC.Signs.kiosk(THREE, t, back, M); },
-        tablet: () => box(0.9, 1.2, 0.25, mats.stone),
+        tablet: (t) => (/CHESS|DICE|TABLE/i.test(t.title || '') ? PR.gameTable() : box(0.9, 1.2, 0.25, mats.stone)),
         crates: () => { const o = new THREE.Group(), a = PR.crate(0.62), b2 = PR.crate(0.52), c = PR.crate(0.46), s1 = PR.sack(), s2 = PR.sack(0.85); b2.position.set(0.62, 0, 0.12); b2.rotation.y = 0.3; c.position.set(0.25, 0.62, 0.02); c.rotation.y = -0.2; s1.position.set(-0.55, 0, 0.25); s2.position.set(-0.45, 0, -0.35); s2.rotation.z = 0.3; o.add(a, b2, c, s1, s2); return o; },
         dock_cargo: () => { const o = new THREE.Group(); [[-0.65, 0], [0, 0.05], [0.65, -0.05]].forEach(([x, z], i) => { const b2 = PR.barrel(0.85, 0.29); b2.position.set(x, 0, z); b2.rotation.y = i; o.add(b2); }); const c = PR.crate(0.6); c.position.set(0, 0, 0.75); o.add(c); const s = PR.sack(); s.position.set(0.7, 0, 0.7); o.add(s); return o; },
         anvil: () => PR.anvil(),
-        telescope: () => { const o = new THREE.Group(); o.add(cyl(0.03, 0.03, 1.1, mats.iron, 6)); const t = cyl(0.08, 0.11, 0.9, mats.brass, 10); t.rotation.z = 1.1; t.position.set(0.2, 1.2, 0); o.add(t); return o; },
-        bell: () => { const o = new THREE.Group(); o.add(box(0.1, 2, 0.1, mats.wood, -0.5)); o.add(box(0.1, 2, 0.1, mats.wood, 0.5)); o.add(box(1.2, 0.12, 0.14, mats.wood, 0, 2, 0)); const b = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.45, 12, 1, true), mats.brass); b.position.y = 1.7; o.add(b); return o; },
+        telescope: () => PR.spyglass(),
+        bell: () => PR.belfry(),
         campfire: () => PR.campfire(),
-        bookshelf: () => box(1.2, 1.8, 0.4, M('#6b4226')),
+        bookshelf: (t) => (/LECTERN/i.test(t.title || '') ? PR.lectern(t.lines) : /LEDGER/i.test(t.title || '') ? PR.ledger(t.lines) : box(1.2, 1.8, 0.4, M('#6b4226'))),
         shrub: (t) => { const kind = { berry: 'berry', fern: 'fern', blossom: 'blossom', frost_bush: 'frost_bush', ember_fern: 'ember_fern' }[t.variant] || 'bush', fb = RC.Flora.bush(THREE, kind, Math.floor(t.x * 7 + t.z), 1);
           const tint0 = new THREE.Color(fb.color), lm = floraMats.leafMat(fb.leaf, 0.06), o = new THREE.Group(), m = new THREE.Mesh(fb.leaves, lm); m.customDepthMaterial = lm.userData.depth; o.add(m); if (fb.bark) { const bk = new THREE.Mesh(fb.bark, floraMats.barkMat('oak')); bk.castShadow = true; o.add(bk); } if (fb.fill) { const fm = new THREE.Mesh(fb.fill, floraMats.fillMat(fb.leaf)); fm.castShadow = true; o.add(fm); const fc = fb.fill.attributes.color; for (let i = 0; i < fc.count; i++) fc.setXYZ(i, fc.getX(i) * tint0.r, fc.getY(i) * tint0.g, fc.getZ(i) * tint0.b); }
           const tint = new THREE.Color(fb.color), c = fb.leaves.attributes.color; for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) * tint.r, c.getY(i) * tint.g, c.getZ(i) * tint.b); o.scale.setScalar(1.15); return o; },

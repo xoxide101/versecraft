@@ -50,6 +50,106 @@
           ge.computeVertexNormals(); const g = new T.Group(), burlap = M('#b09a72', { roughness: 1 }); g.add(mesh(ge, burlap)); g.add(mesh(new T.CylinderGeometry(0.05 * s, 0.07 * s, 0.12 * s, 8), burlap, 0, 0.62 * s, 0)); g.add(mesh(new T.TorusGeometry(0.055 * s, 0.012, 4, 12).rotateX(Math.PI / 2), M('#6a5a3a'), 0, 0.58 * s, 0));
           return g;
         },
+        // ---- the reading lectern outside the library: an oak stand, slanted top, an open book with writing, a small shingled roof over it
+        lectern(lines) {
+          const g = new T.Group(), oakM = woodM('#8a6440', 0.6, 0.6), dark = woodM('#5a3c24', 0.5, 0.5);
+          g.add(mesh(new T.BoxGeometry(0.5, 0.06, 0.4), dark, 0, 0.03, 0));
+          g.add(mesh(new T.CylinderGeometry(0.06, 0.08, 1.0, 8), oakM, 0, 0.55, 0));
+          const top = new T.Group(); top.position.set(0, 1.08, 0); top.rotation.x = 0.45; g.add(top);   // (sloping down toward the reader, who stands in front)
+          top.add(mesh(new T.BoxGeometry(0.62, 0.04, 0.46), oakM));
+          top.add(mesh(new T.BoxGeometry(0.62, 0.05, 0.04), dark, 0, 0.03, 0.23));   // the lip that holds the book
+          // the book: two pages, slightly curved, with the chronicle's words on them
+          const c = document.createElement('canvas'); c.width = 512; c.height = 360; const x = c.getContext('2d'); x.fillStyle = '#efe4c8'; x.fillRect(0, 0, 512, 360);
+          x.fillStyle = 'rgba(120,90,50,0.18)'; x.fillRect(250, 0, 12, 360); x.fillStyle = '#3a2a1a'; x.font = "18px Georgia, serif"; x.textBaseline = 'top';
+          const words = (lines || []).join(' ').split(/\s+/); let px = 18, py = 20, page = 0;
+          for (const w of words) { const ww = x.measureText(w + ' ').width; if (px + ww > (page ? 494 : 236)) { px = page ? 270 : 18; py += 24; if (py > 330) { if (page) break; page = 1; px = 270; py = 20; } } x.fillText(w, px, py); px += ww; }
+          x.fillStyle = '#8a2a1a'; x.font = "bold 34px Georgia, serif"; x.fillText(words[0] ? words[0][0] : 'A', 18, 14);
+          const tex = new T.CanvasTexture(c); tex.colorSpace = T.SRGBColorSpace;
+          const pg = new T.PlaneGeometry(0.56, 0.4, 16, 1), pp = pg.attributes.position; for (let i = 0; i < pp.count; i++) { const u = pp.getX(i) / 0.28; pp.setZ(i, (1 - u * u) * 0.0 + Math.abs(u) * 0.025 * (1 - Math.abs(u))); } pg.computeVertexNormals();
+          const book = new T.Mesh(pg, new T.MeshStandardMaterial({ map: tex, roughness: 0.9 })); book.rotation.x = -Math.PI / 2; book.position.set(0, 0.035, -0.01); top.add(book);
+          top.add(mesh(new T.BoxGeometry(0.58, 0.025, 0.42), M('#5a1e14'), 0, 0.015, -0.01));   // the leather cover under the pages
+          // a little roof on two posts behind
+          const sh = RC.Signs ? RC.Signs.shingles(T) : null;
+          for (const s of [-1, 1]) g.add(mesh(new T.BoxGeometry(0.08, 1.9, 0.08), dark, s * 0.42, 0.95, -0.3));
+          for (const s of [-1, 1]) { const sl = mesh(new T.BoxGeometry(1.0, 0.04, 0.55), new T.MeshStandardMaterial({ map: sh, roughness: 0.9 }), 0, 1.98, -0.3 + s * 0.22); sl.rotation.x = s * 0.55; g.add(sl); }
+          return g;
+        },
+        // ---- the craftworks ledger: a sloped clerk's desk with the open ledger, ink pot and quill, a stool, crates stacked by it
+        ledger(lines) {
+          const g = new T.Group(), oakM = woodM('#7a5a3a', 0.6, 0.6);
+          for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) g.add(mesh(new T.BoxGeometry(0.06, 0.95, 0.06), oakM, sx * 0.45, 0.47, sz * 0.25));
+          const top = mesh(new T.BoxGeometry(1.0, 0.05, 0.6), oakM, 0, 0.98, 0); top.rotation.x = -0.18; g.add(top);
+          const lg = P.lectern(lines).children.find((m) => m.isGroup); if (lg) { const bk = lg.children.find((m) => m.material && m.material.map); if (bk) { const b2 = bk.clone(); b2.position.set(0, 1.03, 0); b2.rotation.set(-Math.PI / 2 - 0.18, 0, 0); g.add(b2); } }
+          g.add(mesh(new T.CylinderGeometry(0.03, 0.035, 0.05, 10), M('#1a1a22', { roughness: 0.3 }), 0.38, 1.04, -0.12));
+          const quill = mesh(new T.ConeGeometry(0.012, 0.24, 5), M('#f2ede4'), 0.38, 1.13, -0.12); quill.rotation.z = 0.4; g.add(quill);
+          g.add(mesh(new T.CylinderGeometry(0.16, 0.18, 0.6, 10), oakM, 0, 0.3, 0.55));
+          const c1 = P.crate(0.5); c1.position.set(0.9, 0, 0.2); g.add(c1); const c2 = P.crate(0.42); c2.position.set(0.86, 0.5, 0.18); c2.rotation.y = 0.3; g.add(c2);
+          return g;
+        },
+        // ---- the chess and dice table: a trestle table, a chequered board with pieces mid-game, dice, mugs, two benches
+        gameTable() {
+          const g = new T.Group(), oakM = woodM('#8a6440', 1, 0.6), dark = woodM('#5a3c24', 0.8, 0.6);
+          g.add(mesh(new T.BoxGeometry(1.6, 0.06, 0.9), oakM, 0, 0.76, 0));
+          for (const s of [-1, 1]) { g.add(mesh(new T.BoxGeometry(0.08, 0.74, 0.7), dark, s * 0.62, 0.37, 0)); g.add(mesh(new T.BoxGeometry(1.4, 0.05, 0.3), oakM, 0, 0.44, s * 0.85)); for (const bx of [-0.55, 0.55]) g.add(mesh(new T.BoxGeometry(0.06, 0.42, 0.26), dark, bx, 0.21, s * 0.85)); }
+          const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'); for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { x.fillStyle = (i + j) % 2 ? '#3a2a1c' : '#e8d8b0'; x.fillRect(i * 32, j * 32, 32, 32); }
+          const bt = new T.CanvasTexture(c); bt.colorSpace = T.SRGBColorSpace; g.add(mesh(new T.BoxGeometry(0.5, 0.03, 0.5), new T.MeshStandardMaterial({ map: bt, roughness: 0.5 }), -0.35, 0.805, 0));
+          const piece = (h) => { const pts = [[0, 0], [0.022, 0], [0.022, 0.008], [0.012, 0.02], [0.01, h * 0.7], [0.016, h * 0.75], [0.008, h], [0, h + 0.004]].map(([a, b]) => new T.Vector2(a, b)); return new T.LatheGeometry(pts, 10); };
+          const wM = M('#f2ead8', { roughness: 0.4 }), bM = M('#2a1e16', { roughness: 0.4 }), r2 = RC.rng(0.77);
+          for (let k = 0; k < 14; k++) { const i = Math.floor(r2() * 8), j = k < 7 ? Math.floor(r2() * 3) : 5 + Math.floor(r2() * 3); g.add(mesh(piece(0.035 + r2() * 0.035), k < 7 ? wM : bM, -0.35 - 0.25 + 0.031 + i * 0.0625, 0.82, -0.25 + 0.031 + j * 0.0625)); }
+          for (let k = 0; k < 3; k++) { const d = mesh(new T.BoxGeometry(0.04, 0.04, 0.04), M('#f4f0e6'), 0.25 + k * 0.07, 0.81, 0.1 + (k % 2) * 0.05); d.rotation.y = k; g.add(d); }
+          for (const [mx, mz] of [[0.55, -0.25], [0.35, 0.3]]) { g.add(mesh(new T.CylinderGeometry(0.05, 0.045, 0.12, 12), woodM('#9a7048', 0.3, 0.3), mx, 0.85, mz)); g.add(mesh(new T.TorusGeometry(0.035, 0.01, 5, 10, Math.PI), dark, mx + 0.05, 0.85, mz)); }
+          return g;
+        },
+        // ---- the spyglass on the pier: a brass telescope on a turned pedestal, pointed out to sea
+        spyglass() {
+          const g = new T.Group(), brass = M('#c8a048', { metalness: 0.85, roughness: 0.3 }), iron = M('#2e3238', { metalness: 0.6, roughness: 0.5 });
+          g.add(mesh(new T.CylinderGeometry(0.22, 0.28, 0.12, 14), GRANM, 0, 0.06, 0));
+          g.add(mesh(new T.CylinderGeometry(0.05, 0.07, 1.05, 10), iron, 0, 0.6, 0));
+          const tube = new T.Group(); tube.position.set(0, 1.2, 0); tube.rotation.set(-0.12, 0.3, 0); g.add(tube);
+          for (const [r1, r2, len, z] of [[0.065, 0.06, 0.55, 0.0], [0.055, 0.05, 0.4, 0.42], [0.045, 0.04, 0.3, 0.74]]) { const s = mesh(new T.CylinderGeometry(r2, r1, len, 14).rotateX(Math.PI / 2), brass, 0, 0, z); tube.add(s); tube.add(mesh(new T.TorusGeometry(r1 + 0.004, 0.008, 5, 16), brass, 0, 0, z - len / 2)); }
+          tube.add(mesh(new T.CylinderGeometry(0.07, 0.07, 0.02, 14).rotateX(Math.PI / 2), M('#1a2a3a', { metalness: 0.2, roughness: 0.05 }), 0, 0, -0.28));
+          return g;
+        },
+        // ---- the warning bell: a timber belfry on four posts with braces, a little roof, a bronze bell with a flared lip, its rope
+        belfry() {
+          const g = new T.Group(), oakM = woodM('#6a4a2c', 0.4, 1), bronze = M('#a8783a', { metalness: 0.8, roughness: 0.35 });
+          for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { g.add(mesh(new T.BoxGeometry(0.14, 2.4, 0.14), oakM, sx * 0.55, 1.2, sz * 0.45)); const br = mesh(new T.BoxGeometry(0.07, 0.6, 0.07), oakM, sx * 0.4, 1.95, sz * 0.45); br.rotation.z = sx * 0.6; g.add(br); }
+          for (const sz of [-1, 1]) g.add(mesh(new T.BoxGeometry(1.3, 0.14, 0.14), oakM, 0, 2.35, sz * 0.45));
+          g.add(mesh(new T.BoxGeometry(0.14, 0.14, 1.04), oakM, 0, 2.28, 0));
+          const sh = RC.Signs ? RC.Signs.shingles(T) : null; for (const s of [-1, 1]) { const sl = mesh(new T.BoxGeometry(1.5, 0.05, 0.75), new T.MeshStandardMaterial({ map: sh, roughness: 0.9 }), 0, 2.72, s * 0.3); sl.rotation.x = s * 0.62; g.add(sl); }
+          const pts = [[0, 0.42], [0.06, 0.42], [0.11, 0.4], [0.14, 0.33], [0.16, 0.2], [0.2, 0.08], [0.27, 0.0], [0.27, -0.02], [0.24, 0.0], [0.17, 0.08], [0.13, 0.2], [0.11, 0.33], [0, 0.37]].map(([a, b]) => new T.Vector2(a, b));
+          const bell = mesh(new T.LatheGeometry(pts, 24), bronze, 0, 1.78, 0); g.add(bell);
+          g.add(mesh(new T.SphereGeometry(0.05, 10, 8), iron, 0, 1.8, 0)); g.add(mesh(new T.CylinderGeometry(0.012, 0.012, 0.25, 5), iron, 0, 1.92, 0));
+          g.add(mesh(new T.CylinderGeometry(0.012, 0.012, 1.6, 5), M('#c8b088'), 0.12, 0.98, 0));
+          return g;
+        },
+        // ---- fountain water: a still pool surface that ripples (rings spreading from where the water falls), and falling veils
+        poolWater(ringR) {
+          const m = new T.MeshStandardMaterial({ color: '#5a7a74', transparent: true, opacity: 0.8, roughness: 0.05, metalness: 0.1, envMapIntensity: 1.5, depthWrite: false });
+          m.onBeforeCompile = (sh) => { sh.uniforms.uTime = shared.uTime; sh.uniforms.uRing = { value: ringR };
+            sh.vertexShader = 'varying vec3 vPw;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vPw = position;');
+            sh.fragmentShader = 'uniform float uTime; uniform float uRing; varying vec3 vPw;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+              { float r = length(vPw.xz); float d = abs(r - uRing);
+                float w = sin(d * 60.0 - uTime * 7.0) * exp(-d * 5.0) * 0.5 + sin(vPw.x * 23.0 + uTime * 1.3) * sin(vPw.z * 19.0 - uTime * 1.1) * 0.15;
+                vec2 gd = normalize(vPw.xz + 1e-4) * w; normal = normalize(normal + (viewMatrix * vec4(gd.x * 0.35, 0.0, gd.y * 0.35, 0.0)).xyz);
+                float foam = smoothstep(0.06, 0.0, d) * (0.5 + 0.5 * sin(atan(vPw.z, vPw.x) * 9.0 + uTime * 5.0));
+                diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.95, 0.96), foam * 0.6); diffuseColor.a = max(diffuseColor.a, foam * 0.7); }`); };
+          m.customProgramCacheKey = () => 'fountain-pool'; m.userData.noWeather = true; return m;
+        },
+        // a sheet of water falling from one lip to the pool below: a curtain shaped like the fall, streaks running down it
+        veil(r0, y0, r1, y1) {
+          const pts = []; for (let i = 0; i <= 10; i++) { const f = i / 10; pts.push(new T.Vector2(r0 + (r1 - r0) * Math.pow(f, 0.6), y0 + (y1 - y0) * f * f)); }
+          const ge = new T.LatheGeometry(pts, 40);
+          const m = new T.MeshStandardMaterial({ color: '#d8e8ec', transparent: true, roughness: 0.1, metalness: 0.1, side: T.DoubleSide, depthWrite: false, envMapIntensity: 1.5 });
+          m.onBeforeCompile = (sh) => { sh.uniforms.uTime = shared.uTime;
+            sh.vertexShader = 'varying vec2 vVu;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vVu = uv;');
+            sh.fragmentShader = 'uniform float uTime; varying vec2 vVu;\n float vh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5); }\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+              { float col = floor(vVu.x * 160.0), sp = 0.8 + vh(vec2(col, 1.0)) * 0.6, s = fract(vVu.y * 3.0 + uTime * sp * 1.4 + vh(vec2(col, 2.0)));
+                float streak = smoothstep(0.0, 0.25, s) * (1.0 - smoothstep(0.5, 1.0, s));
+                diffuseColor.a = (0.05 + streak * 0.32) * (0.5 + 0.5 * vh(vec2(col, 3.0))) * smoothstep(0.0, 0.12, 1.0 - vVu.y); }`); };
+          m.customProgramCacheKey = () => 'fountain-veil'; m.userData.noWeather = true;
+          const v = new T.Mesh(ge, m); v.renderOrder = 2; return v;
+        },
         // the chest: planked and iron-bound, a rounded lid on hinges at the back (named 'lid' for the game to swing open), a lock plate, coins inside
         chest() {
           const g = new T.Group(), W = 0.78, H = 0.42, D = 0.5;
