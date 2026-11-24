@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Covers Lab</title>
+<style>
+  :root { --ink: #e8f0ff; --panel: rgba(14, 24, 52, .86); --edge: rgba(120, 160, 255, .45); --gold: #facc15; --dim: #9fb3d9; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #3c3c40; color: var(--ink); font: 13px system-ui, "Segoe UI", sans-serif; }
+  #stage { position: fixed; inset: 0; } #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .bar { position: fixed; left: 12px; top: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--panel); border: 1.5px solid var(--edge); }
+  .bar b { color: var(--gold); margin-right: 6px; } .bar button { background: #16264f; color: var(--ink); border: 1px solid var(--edge); border-radius: 6px; padding: 4px 10px; cursor: pointer; font: inherit; }
+  .bar label { display: flex; gap: 5px; align-items: center; color: var(--dim); margin-left: 6px; } .bar input[type=range] { width: 90px; }
+  .help { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); padding: 4px 12px; border-radius: 6px; background: rgba(14,24,52,.7); color: var(--dim); font-size: 12px; white-space: nowrap; }
+  .tag { position: fixed; padding: 3px 9px; border-radius: 4px; background: rgba(20,20,24,.85); font: 700 12px ui-monospace, Consolas, monospace; letter-spacing: .04em; text-transform: uppercase; transform: translate(-50%, 0); cursor: pointer; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div class="bar" id="bar"><b>COVERS LAB</b></div>
+<div class="help">drag to turn · right-drag or Shift-drag to move · wheel to zoom · click a name to go to it · the blend field is at the front</div>
+<script src="../lib/realm-libs.js"></script>
+<script src="../js/rc-core.js"></script>
+<script src="../js/rc-textures.js"></script>
+<script src="../js/rc-covers.js"></script>
+<script>
+(function () {
+  const T = THREE;
+  const host = document.getElementById('stage'), rd = new T.WebGLRenderer({ antialias: true });
+  rd.setPixelRatio(Math.min(devicePixelRatio, 2)); rd.shadowMap.enabled = true; rd.shadowMap.type = T.PCFSoftShadowMap; rd.toneMapping = T.ACESFilmicToneMapping; rd.outputColorSpace = T.SRGBColorSpace; host.append(rd.domElement);
+  const scene = new T.Scene(); scene.background = new T.Color('#3c3c40'); const cam = new T.PerspectiveCamera(30, 1, 0.05, 500);
+  const hemi = new T.HemisphereLight('#e6eeff', '#3a3a30', 0.9), sun = new T.DirectionalLight('#fff3e0', 2.4); sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
+  Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 160 }); sun.shadow.bias = -0.0002; sun.shadow.normalBias = 0.02; scene.add(hemi, sun, sun.target);
+  const shared = { uTime: { value: 0 }, uWind: { value: new T.Vector3(1, 0.3, 0.4) }, uRain: { value: 0 } };
+  const keys = Object.keys(RC.Covers.RECIPES), PER = 6, S = 4, GAP = 2.6, tiles = [], tags = [];
+  // the tiles: every recipe on its own ground, in rows like a swatch sheet
+  keys.forEach((k, i) => {
+    const R = RC.Covers.RECIPES[k], col = i % PER, row = Math.floor(i / PER), x = (col - (PER - 1) / 2) * (S + GAP), z = -row * (S + GAP + 1.2) - 6;
+    const base = new T.Mesh(new T.BoxGeometry(S, 0.12, S), new T.MeshStandardMaterial({ color: R.ground, roughness: 0.95 })); base.position.set(x, -0.06, z); base.receiveShadow = true; scene.add(base);
+    if (k === 'kelp_bed') { const box = new T.Mesh(new T.BoxGeometry(S, 2.2, S), new T.MeshStandardMaterial({ color: '#4a7ab0', transparent: true, opacity: 0.22, depthWrite: false })); box.position.set(x, 1.1, z); scene.add(box); }
+    const m = new T.Mesh(RC.Covers.build(T, R, S, S, i + 1), RC.Covers.material(T, shared, R.rigid)); m.position.set(x, 0, z); m.castShadow = true; m.receiveShadow = true; scene.add(m);
+    tiles.push({ k, name: R.name, x, z });
+    const tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = k; tag.onclick = () => goTo(tiles[i]); document.body.append(tag); tags.push(tag);
+  });
+  // the blend field: covers running into each other around a pond and a rock, with bare ground showing through
+  const F = { x: 0, z: 14, w: 30, d: 16 }, vn = RC.Covers.vnoise;
+  const groundCv = RC.Tex.cv(512, 256), g = groundCv.getContext('2d');
+  for (let y = 0; y < 256; y += 4) for (let x = 0; x < 512; x += 4) { const n = vn(x, y, 40, 3) * 0.6 + vn(x, y, 12, 4) * 0.4; g.fillStyle = `hsl(${28 + n * 20}, ${22 + n * 10}%, ${22 + n * 10}%)`; g.fillRect(x, y, 4, 4); }
+  const field = new T.Mesh(new T.PlaneGeometry(F.w, F.d).rotateX(-Math.PI / 2), new T.MeshStandardMaterial({ map: RC.Tex.tex(T, groundCv), roughness: 0.95 })); field.position.set(F.x, 0.001, F.z); field.receiveShadow = true; scene.add(field);
+  const pond = { x: -8, z: 0, r: 3 }, rock = { x: 6, z: 1, r: 1.1 };
+  const water = new T.Mesh(new T.CircleGeometry(pond.r, 40).rotateX(-Math.PI / 2), new T.MeshStandardMaterial({ color: '#3a6a8a', roughness: 0.15, transparent: true, opacity: 0.85 })); water.position.set(F.x + pond.x, 0.02, F.z + pond.z); scene.add(water);
+  const rk = RC.Tex.surface(T, 'rock'), rockGeo = new T.IcosahedronGeometry(1, 4), rp = rockGeo.attributes.position;
+  for (let i = 0; i < rp.count; i++) { const n = 1 + (vn(rp.getX(i) * 3 + 9, rp.getZ(i) * 3 + rp.getY(i) * 2, 1, 5) - 0.5) * 0.4; rp.setXYZ(i, rp.getX(i) * n * 1.3, Math.max(-0.2, rp.getY(i) * n * 0.7), rp.getZ(i) * n); } rockGeo.computeVertexNormals();
+  const rockM = new T.Mesh(rockGeo, new T.MeshStandardMaterial({ map: rk.map, normalMap: rk.normalMap, roughness: 0.95 })); rockM.position.set(F.x + rock.x, 0.2, F.z + rock.z); rockM.castShadow = rockM.receiveShadow = true; scene.add(rockM);
+  const dist = (x, z, c) => Math.hypot(x - c.x, z - c.z) - c.r;
+  const gaps = (x, z) => RC.smooth01((vn(x + 99, z + 99, 2.2, 11) - 0.28) / 0.25);   // bare ground here and there
+  const fieldMasks = {   // each cover's share of the field: soft edges, overlaps, thicker by the pond and the rock
+    reed_marsh: (x, z) => { const d = dist(x, z, pond); return d < -0.4 ? 0 : RC.smooth01(1 - Math.abs(d - 0.6) / 1.4); },
+    elephant_grass: (x, z) => { const d = dist(x, z, pond); return RC.smooth01(1 - Math.abs(d - 2.6) / 1.6) * 0.7 * gaps(x, z); },
+    meadow: (x, z) => { const a = RC.smooth01((x + 2) / 6) * (1 - RC.smooth01((x - 10) / 3)); return a * gaps(x, z) * (dist(x, z, pond) > 2 ? 1 : 0); },
+    wildflower_meadow: (x, z) => RC.smooth01((vn(x, z, 3, 21) - 0.55) / 0.15) * gaps(x, z) * (dist(x, z, pond) > 3 ? 1 : 0),
+    tall_prairie: (x, z) => RC.smooth01((x - 8) / 4) * gaps(x, z),
+    tiny_spinifex: (x, z) => { const d = dist(x, z, rock); return d < 0 ? 0 : 1 - RC.smooth01(d / 1.6); },
+    seed_heads: (x, z) => { const d = dist(x, z, rock); return d < 0.4 ? 0 : RC.smooth01(1 - Math.abs(d - 1.4) / 1.2) * 0.6; },
+    clover: (x, z) => RC.smooth01((vn(x, z, 1.6, 31) - 0.62) / 0.1) * (dist(x, z, pond) > 1.5 ? 1 : 0),
+  };
+  for (const [k, mask] of Object.entries(fieldMasks)) {
+    const R = RC.Covers.RECIPES[k], local = (x, z) => mask(x, z);
+    const m = new T.Mesh(RC.Covers.build(T, R, F.w, F.d, 40 + k.length, local), RC.Covers.material(T, shared, R.rigid)); m.position.set(F.x, 0, F.z); m.castShadow = true; m.receiveShadow = true; scene.add(m);
+  }
+  tiles.push({ k: 'blend field', name: 'Blend field', x: F.x, z: F.z, big: true });
+  // controls
+  const view = { yaw: 0.55, pitch: 0.62, dist: 34, target: new T.Vector3(0, 0, 8) };
+  let drag = null; const cv = rd.domElement;
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+  cv.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, pan: e.button === 2 || e.shiftKey }; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', (e) => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+    if (drag.pan) { const k = view.dist * 0.0016; view.target.x -= (Math.cos(view.yaw) * dx + Math.sin(view.yaw) * dy) * k; view.target.z += (Math.sin(view.yaw) * dx - Math.cos(view.yaw) * dy) * k; }
+    else { view.yaw -= dx * 0.008; view.pitch = RC.clamp(view.pitch + dy * 0.006, 0.02, 1.45); } });
+  cv.addEventListener('pointerup', () => { drag = null; });
+  cv.addEventListener('wheel', (e) => { view.dist = RC.clamp(view.dist * (1 + Math.sign(e.deltaY) * 0.12), 0.4, 120); e.preventDefault(); }, { passive: false });
+  const goTo = (t) => { view.target.set(t.x, 0.3, t.z); view.dist = t.big ? 22 : 7.5; };
+  const bar = document.getElementById('bar');
+  const btn = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.onclick = fn; bar.append(b); };
+  btn('swatches', () => { view.target.set(0, 0, -16); view.dist = 70; view.pitch = 0.75; }); btn('blend field', () => goTo(tiles[tiles.length - 1]));
+  const slider = (label, min, max, val, fn) => { const l = document.createElement('label'); const i = document.createElement('input'); i.type = 'range'; i.min = min; i.max = max; i.step = 'any'; i.value = val; i.oninput = () => fn(+i.value); l.append(label, i); bar.append(l); fn(val); };
+  let wind = 0.4, rain = 0, hour = 14;
+  slider('wind', 0, 1.6, wind, (v) => { wind = v; }); slider('rain', 0, 1, rain, (v) => { rain = v; }); slider('hour', 6, 19, hour, (v) => { hour = v; });
+  const resize = () => { const w = innerWidth, h = innerHeight; rd.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); }; resize(); addEventListener('resize', resize);
+  const clock = new T.Clock();
+  (function frame() {
+    const t = clock.getElapsedTime(); shared.uTime.value = t; shared.uWind.value.set(0.9, 0.35, wind); shared.uRain.value = rain;
+    const a = ((hour - 6) / 13) * Math.PI, sy = Math.sin(a); sun.position.set(view.target.x + Math.cos(a) * 40, Math.max(4, sy * 50), view.target.z + 25); sun.target.position.copy(view.target); sun.intensity = 0.5 + Math.max(0, sy) * 2.2; sun.color.set(sy < 0.35 ? '#ffc48a' : '#fff3e0');
+    const h = view.dist * Math.cos(view.pitch); cam.position.set(view.target.x + Math.sin(view.yaw) * h, view.target.y + view.dist * Math.sin(view.pitch), view.target.z + Math.cos(view.yaw) * h); cam.lookAt(view.target);
+    tiles.forEach((tl, i) => { if (!tags[i]) return; const v = new T.Vector3(tl.x, 0, tl.z + S / 2 + 0.6).project(cam); const on = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1; tags[i].style.display = on ? '' : 'none'; tags[i].style.left = (v.x + 1) / 2 * innerWidth + 'px'; tags[i].style.top = (1 - v.y) / 2 * innerHeight + 'px'; });
+    rd.render(scene, cam); requestAnimationFrame(frame);
+  })();
+  window.LAB = { view, goTo, tiles };
+})();
+</script>
+</body>
+</html>

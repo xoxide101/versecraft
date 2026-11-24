@@ -63,3 +63,14 @@ a simulation that scales (detail rings). Other open-source city builders: check 
 The owner's reference: rich hand-made detail like a full RPG tileset (walls, fences, stairs, furniture, market goods, interiors)
 and painted heroes, but in 3D and higher. Code-made models are the base; real quality comes from made models (GLB) dropped in by name:
 from 3DCraft, from CC0 kits (ask before downloading), or commissioned. References are ideas only, never copied assets.
+
+## Ground covers (2026-11-23)
+`js/rc-covers.js`: 36 cover recipes (meadow, prairie, wheat, savanna, lawn, stylized, summer/autumn tall and wild, wildflowers, seed heads,
+white and yellow flowers, tiny spinifex filler, reed marsh, pampas, elephant grass, rye and cornflowers, cotton bog, dune marram, spinifex,
+frosted meadow, forest moss / ferns / floor / bracken, clover, broad leaf, kelp, corkscrew alien, crystal spires, blighted, burnt regrowth,
+lavender, cel field, cozy pastel). A mask blends covers into each other, leaves bare ground, thickens near things. Wind rolls across in gusts
+and bends stems by an angle (tall ones swing, tufts barely stir); rain weighs tips down. Labs: `lab/covers.html`, `lab/flora.html`, `lab/shrubs.html`.
+
+## Open-source finds (licences checked)
+MIT (code usable): ez-tree (procedural trees for three.js), anyCreature (text → rigged, animated GLB creatures, made for AI sessions),
+SpatialTrees (C# quadtrees/octrees: the idea for detail rings and "what's near"). AGPL-3.0 (ideas only): Citybound, Kuso-Physics.
