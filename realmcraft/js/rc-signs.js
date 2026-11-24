@@ -11,7 +11,7 @@
   const HAND = "'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive", SERIF = "Georgia, 'Times New Roman', serif";
   const ICON = { smithery_foundry: '⚒', grand_guildhall: '🛡', observatory_parlor: '🔮', two_story_timber: '⚔', l_wing_inn: '🛏', one_story_cottage: '📦', longhouse_tavern: '🍺', apothecary_conservatory: '🌿' };
   const ICONBYNAME = [[/LIBRARY/i, '📖'], [/HARBOR|HARBOUR/i, '⚓'], [/FORTUNE|PARLOR/i, '🔮'], [/INN/i, '🛏'], [/ANCHOR|TAVERN/i, '🍺'], [/HERB/i, '🌿'], [/ARMOR|ARMOUR/i, '⚔'], [/SMITH/i, '⚒'], [/GUILD/i, '🛡'], [/WAREHOUSE/i, '📦']];
-  const nice = (s) => String(s).toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()).replace(/’S\b/g, '’s');
+  const nice = (s) => String(s).toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()).replace(/(['’])S\b/g, '$1s');
 
   // wood grain behind painted letters
   const woodBack = (g, w, h, base, seed) => {
