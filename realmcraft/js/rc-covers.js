@@ -58,8 +58,8 @@
   };
 
   // one patch w × d, as one mesh (blades are both-faced and lit from above, so there are no dark backs)
-  RC.Covers.build = function (T, R, w, d, seed = 1, mask = null) {
-    const r = RC.rng(seed * 977 + R.name.length), pos = [], col = [], idx = [], area = (w * d) / 16;
+  RC.Covers.build = function (T, R, w, d, seed = 1, mask = null, opt = {}) {   // opt.density (0..1 of the lab's), opt.height(x, z) for ground that isn't flat
+    const r = RC.rng(seed * 977 + R.name.length), pos = [], col = [], idx = [], area = (w * d) / 16 * (opt.density == null ? 1 : opt.density), GY = opt.height || (() => 0);
     const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
     const range = (a) => a[0] + r() * (a[1] - a[0]);
     const blade = (x, z, h, wd, ang, lean, droop, c0, c1, stiff, seg = 5, twist = 0, wave = 0, y0 = 0) => {   // (y0: where it starts, for parts high on a stem)
@@ -89,7 +89,7 @@
       b = R.frost ? lerp3(c1, [1, 1, 1], r() * 0.6) : lerp3(b, c0, r() * 0.2);
       if (R.regrow && r() < R.regrow.chance) { a = C(R.regrow.root); b = C(R.regrow.tip); }
       if (R.glow) { a = a.map((v) => v + R.glow * 0.3); b = b.map((v) => Math.min(1.3, v + R.glow)); }
-      const tip = blade(x, z, h, R.w * (0.7 + r() * 0.6), ang, R.lean * (0.5 + r()), R.droop * (0.5 + r()), a, b, R.stiff, R.wave ? 8 : 5, R.twist ? R.twist * (0.7 + r() * 0.6) : 0, R.wave || 0);
+      const tip = blade(x, z, h, R.w * (0.7 + r() * 0.6), ang, R.lean * (0.5 + r()), R.droop * (0.5 + r()), a, b, R.stiff, R.wave ? 8 : 5, R.twist ? R.twist * (0.7 + r() * 0.6) : 0, R.wave || 0, GY(x, z));
       if (head && head.chance && r() < head.chance) {
         const hc = C(head.color);
         if (head.kind === 'cattail') blob(tip[0], tip[1] - 0.12, tip[2], 0.028, 0.11, hc);
@@ -100,33 +100,34 @@
         else if (head.kind === 'leaflets') { for (let k = 0; k < 3; k++) { const la = k * 2.09 + ang; blob(tip[0] + Math.cos(la) * 0.012, tip[1], tip[2] + Math.sin(la) * 0.012, 0.012, 0.004, hc.map((v) => v * (0.9 + r() * 0.2)), 6); } }
       }
     };
-    const flower = (x, z) => { if (!keep(x, z)) return; const h = range(fl.h), c = C(fl.colors[Math.floor(r() * fl.colors.length)]); const tip = blade(x, z, h, 0.004, r() * 6.28, 0.05, 0, C('#4a6a2a'), C('#5a7a3a'), true, 3);
+    const flower = (x, z) => { if (!keep(x, z)) return; const h = range(fl.h), c = C(fl.colors[Math.floor(r() * fl.colors.length)]); const tip = blade(x, z, h, 0.004, r() * 6.28, 0.05, 0, C('#4a6a2a'), C('#5a7a3a'), true, 3, 0, 0, GY(x, z));
       if (fl.big) { for (let k = 0; k < 5; k++) { const pa = k * 1.256; blob(tip[0] + Math.cos(pa) * 0.022, tip[1], tip[2] + Math.sin(pa) * 0.022, 0.018, 0.006, c, 5); } blob(tip[0], tip[1] + 0.004, tip[2], 0.01, 0.008, C('#f0a020'), 5); }
       else blob(tip[0], tip[1], tip[2], 0.03, 0.016, c, 6); };
-    const plume = (x, z) => { const ph = range(head.h), ang = r() * 6.28, lean = 0.08 + r() * 0.12; const tip = blade(x, z, ph, 0.006, ang, lean, 0, C('#bfb79a'), C('#d8cfb4'), true, 4);
+    const plume = (x, z) => { const ph = range(head.h), ang = r() * 6.28, lean = 0.08 + r() * 0.12; const tip = blade(x, z, ph, 0.006, ang, lean, 0, C('#bfb79a'), C('#d8cfb4'), true, 4, 0, 0, GY(x, z));
       for (let k = 0; k < 14; k++) blade(tip[0] - Math.cos(ang) * 0.02, tip[2] - Math.sin(ang) * 0.02, 0.32 + r() * 0.12, 0.012, ang + (r() - 0.5) * 1.4, 0.25 + r() * 0.3, 0.1, C(head.color), C('#fffaf0'), false, 3, 0, 0, tip[1] - 0.42 + k * 0.025); };
     const clumpAt = (cx, cz) => { const n = Math.round(range(R.perClump)); for (let i = 0; i < n; i++) plant(cx + (r() - 0.5) * R.spread, cz + (r() - 0.5) * R.spread); if (head && head.kind === 'plume') for (let i = 0, m = Math.round(range(head.perClump)); i < m; i++) plume(cx + (r() - 0.5) * 0.1, cz + (r() - 0.5) * 0.1); };
     if (R.layout === 'even') for (let i = 0, n = Math.round(R.count * area); i < n; i++) plant((r() - 0.5) * w, (r() - 0.5) * d);
     else if (R.layout === 'rows') for (let j = 0; j < R.rows; j++) for (let i = 0; i < R.perRow; i++) clumpAt(-w / 2 + (i + 0.5) * (w / R.perRow) + (r() - 0.5) * 0.08, -d / 2 + (j + 0.5) * (d / R.rows) + (r() - 0.5) * 0.08);
     else for (let k = 0, n = Math.round(R.clumps * area); k < n; k++) { const cx = (r() - 0.5) * w * 0.94, cz = (r() - 0.5) * d * 0.94; if (mask && r() > mask(cx, cz) * 1.3) continue; clumpAt(cx, cz); }
-    if (R.extra) { const e = R.extra; for (let i = 0, n = Math.round(60 * area); i < n; i++) if (r() < e.chance) { const ex = (r() - 0.5) * w, ez = (r() - 0.5) * d; if (keep(ex, ez)) blade(ex, ez, range(e.h), 0.03, r() * 6.28, 0.35, 0.3, c0, C(e.tip), false); } }
+    if (R.extra) { const e = R.extra; for (let i = 0, n = Math.round(60 * area); i < n; i++) if (r() < e.chance) { const ex = (r() - 0.5) * w, ez = (r() - 0.5) * d; if (keep(ex, ez)) blade(ex, ez, range(e.h), 0.03, r() * 6.28, 0.35, 0.3, c0, C(e.tip), false, 5, 0, 0, GY(ex, ez)); } }
     if (fl) for (let i = 0, n = Math.round((R.count || 300) * area); i < n; i++) if (r() < fl.chance) flower((r() - 0.5) * w, (r() - 0.5) * d);
     const ge = new T.BufferGeometry(); ge.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); ge.setAttribute('color', new T.Float32BufferAttribute(col, 3)); ge.setIndex(idx);
+    if (opt.height) { const up = new Float32Array(pos.length / 3); for (let i = 0; i < up.length; i++) up[i] = Math.max(0, pos[i * 3 + 1] - GY(pos[i * 3], pos[i * 3 + 2])); ge.setAttribute('above', new T.BufferAttribute(up, 1)); }   // (height above the ground: the wind uses it)
     const nor = new Float32Array(pos.length); for (let i = 1; i < nor.length; i += 3) nor[i] = 1; ge.setAttribute('normal', new T.BufferAttribute(nor, 3));
     return ge;
   };
 
   // how covers move: gusts roll across in waves; a blade's sway grows with the square of its height
   // (so tall stems swing and short tufts barely stir); rain bends the tips down and out; rigid ones (crystals) don't move
-  RC.Covers.material = function (T, shared, rigid) {
+  RC.Covers.material = function (T, shared, rigid, onGround) {   // onGround: the patch sits on uneven ground (an 'above' value per point)
     const m = new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.82 });
     if (rigid) return m;
     m.onBeforeCompile = (sh) => {
       sh.uniforms.uTime = shared.uTime; sh.uniforms.uWind = shared.uWind; sh.uniforms.uRain = shared.uRain || { value: 0 };
-      sh.vertexShader = 'uniform float uTime; uniform vec3 uWind; uniform float uRain;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      sh.vertexShader = 'uniform float uTime; uniform vec3 uWind; uniform float uRain;\n' + (onGround ? 'attribute float above;\n' : '') + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         vec4 wp0 = modelMatrix * vec4(position, 1.0);
         vec2 dir = normalize(vec2(uWind.x, uWind.y) + vec2(0.0001, 0.0));
-        float h = max(position.y, 0.0);
+        float h = ${onGround ? 'above' : 'max(position.y, 0.0)'};
         float gust = sin(dot(wp0.xz, dir) * 0.55 - uTime * 2.2) * 0.5 + 0.5;           // a wave rolling across the field
         gust = gust * gust * (0.6 + 0.4 * sin(dot(wp0.xz, vec2(-dir.y, dir.x)) * 0.31 + uTime * 0.7));
         float flick = sin(uTime * 4.0 + wp0.x * 7.0 + wp0.z * 5.0) * 0.15;              // small quick stirring
@@ -136,7 +137,7 @@
         transformed.y -= (1.0 - cos(ang)) * bend;                                             // bending lowers the tip
         float wet = uRain * 0.35; transformed.y -= (1.0 - cos(wet)) * bend * 1.6; transformed.x += dir.x * sin(wet) * bend * 0.5; transformed.z += dir.y * sin(wet) * bend * 0.5;`);
     };
-    m.customProgramCacheKey = () => 'cover';
+    m.customProgramCacheKey = () => 'cover' + (onGround ? 'g' : '');
     return m;
   };
 })();

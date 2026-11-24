@@ -28,11 +28,12 @@
       this.sun = new THREE.DirectionalLight('#fff4e0', 1.6); this.sun.castShadow = true; const sc = this.sun.shadow;
       sc.mapSize.set(RC.quality.shadowMap, RC.quality.shadowMap); sc.camera.left = sc.camera.bottom = -26; sc.camera.right = sc.camera.top = 26; sc.camera.near = 1; sc.camera.far = 120; sc.bias = -0.0004; sc.normalBias = 0.03;
       this.scene.add(this.sun, this.sun.target);
-      this.shared = { uTime: { value: 0 }, uWind: { value: new THREE.Vector3(0.3, 0.1, 0.4) }, uCam: { value: new THREE.Vector3() }, uPlayer: { value: new THREE.Vector3() } };
+      this.shared = { uTime: { value: 0 }, uWind: { value: new THREE.Vector3(0.3, 0.1, 0.4) }, uCam: { value: new THREE.Vector3() }, uPlayer: { value: new THREE.Vector3() }, uRain: { value: 0 } };
       // the land and what's on it
       this.scene.add(sim.terrain.build(THREE));
       const map = RC.MapCraft.build(THREE, realm, sim.terrain, this.shared);
       this.scene.add(map.group); this.labels = map.labels; this.tickers = map.tickers; this.buildings = map.buildings;
+      this.cover = new RC.GroundCover(THREE, realm, sim.terrain, sim.plan, this.shared); this.scene.add(this.cover.group);   // grasses, reeds, wildflowers (rc-groundcover.js)
       // the cast
       this.rigs = new Map();
       for (const p of [...sim.people, ...sim.players]) {
@@ -128,6 +129,8 @@
         rg.root.position.set(p.x, sim.terrain.groundY(p.x, p.z), p.z); rg.root.rotation.y = Math.PI / 2 - p.angle;
         if (p.ring !== 'far' || (this.frameN = (this.frameN || 0) + 1) % 4 === 0) rg.update(p, t);   // detail rings: far bodies animate less often
       }
+      this.cover.update(pl.x, pl.z);
+      this.shared.uRain.value = RC.damp(this.shared.uRain.value, sim.weather === 'storm' ? 1 : sim.weather === 'rain' ? 0.7 : 0, 0.5, dt);
       for (const fn of this.tickers) fn(t, { night: this.night, cam: this.cam, season: now.seasonIndex });
       if (this.bloom) this.bloom.strength = 0.18 + this.night * 0.55;
       if (RC.settings.seeThrough === 'fade') this.fadeBlockers(pl);
