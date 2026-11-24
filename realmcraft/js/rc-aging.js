@@ -127,15 +127,16 @@
   // ---------------------------------------------------------------- the pieces
   RC.Aging = {
     // stone foundation all round: two or three courses of small granite-ish blocks, each its own size and shade, going down into the ground
-    foundation(T, W, D, h, stone, seed) {
+    foundation(T, W, D, h, stone, seed, gap) {   // gap: [x0, x1] on the front left open above ground (the doorway and its steps)
       const r = rng(seed), parts = [], m4 = new T.Matrix4(), tints = ['#e8e4dc', '#d8d4cc', '#f0eadf', '#ccc8be', '#e0d8c8', '#c0bcb4'];
       const courses = [[-0.45, 0.42], [-0.03, 0.26], [0.23, h - 0.23]];
-      const run = (len, place) => {
+      const run = (len, place, gp) => {
         for (const [y0, ch] of courses) { if (ch < 0.08) continue; let x = -len / 2 - r() * 0.2;
-          while (x < len / 2) { const bw = Math.min(0.3 + r() * 0.45, len / 2 - x + 0.05); if (bw < 0.12) break; const bh = ch * (0.92 + r() * 0.1);
+          while (x < len / 2) { let bw = Math.min(0.3 + r() * 0.45, len / 2 - x + 0.05); if (bw < 0.12) break; const bh = ch * (0.92 + r() * 0.1);
+            if (gp && y0 > -0.1) { if (x >= gp[0] - 0.01 && x < gp[1]) { x = gp[1]; continue; } if (x < gp[0] && x + bw > gp[0]) bw = gp[0] - x; if (bw < 0.1) { x = gp[1]; continue; } }
             const g = roughBox(T, bw - 0.025, bh - 0.02, 0.32 + r() * 0.06, 0.05, r); place(m4, x + bw / 2, y0 + bh / 2, (r() - 0.5) * 0.03); parts.push({ geo: g, mat4: m4.clone(), color: tints[Math.floor(r() * tints.length)] }); x += bw; } }
       };
-      run(W + 0.32, (m, x, y, o) => m.makeTranslation(x, y, D / 2 + 0.02 + o));
+      run(W + 0.32, (m, x, y, o) => m.makeTranslation(x, y, D / 2 + 0.02 + o), gap);
       run(W + 0.32, (m, x, y, o) => m.makeTranslation(x, y, -D / 2 - 0.02 + o));
       run(D, (m, x, y, o) => m.makeRotationY(Math.PI / 2).setPosition(W / 2 + 0.02 + o, y, x));
       run(D, (m, x, y, o) => m.makeRotationY(Math.PI / 2).setPosition(-W / 2 - 0.02 + o, y, x));

@@ -64,7 +64,7 @@
       const surf = (k) => RC.Tex.surface(THREE, k);
       const real = (n, fb) => { const x = RC.Tex.real(THREE, n); return x ? { map: x.map, normalMap: x.normalMap, arm: x.arm, m: x.meters[0] } : Object.assign({ m: 2.4 }, fb); };
       const WT = { plaster: real('plaster', surf('plaster')), plasterWorn: real('plaster_worn', surf('plaster')), timber: real('plaster', surf('timber')), stone: real('stone_wall', surf('stone')), darkstone: real('castle_wall', surf('darkstone')), brick: real('red_brick', surf('stone')) }, RT = Object.assign({ m: 2.2 }, surf('roof'));
-      const GRAN = real('rock_lichen', surf('stone')), GRANM = M('#c8c4bc', { map: GRAN.map, normalMap: GRAN.normalMap, roughness: 0.95 });
+      const GRAN = real('rock_lichen', surf('stone')), GRANM = M('#f2eee6', { map: GRAN.map, normalMap: GRAN.normalMap, roughness: 0.95 });
       const OAK = real('planks_oak', null), PAINT = ['#f4ecdc', '#efe0b8', '#ead2aa', '#dfe7ea', '#f2dcd2', '#e7e2c8', '#d9e4cf'];
       const woodM = (tint, sx = 1, sy = 1) => { if (!OAK) return M(tint); const r2 = (tx) => { const c = tx.clone(); c.needsUpdate = true; c.repeat.set(sx, sy); return c; }; return M(tint, { map: r2(OAK.map), normalMap: r2(OAK.normalMap), roughness: 0.85 }); };
       const beamM = woodM('#6b4a30', 0.3, 1), doorM = woodM('#8a5a34', 0.6, 0.9), frameM = woodM('#5a3c26', 0.4, 0.4);
@@ -130,44 +130,42 @@
               for (const sgn of pick < 0.25 ? [1, -1] : [RC.hash(i, 3, 37) < 0.5 ? 1 : -1]) { const br = box(0.1, len, 0.05, beamM, -span / 2 + (i + 0.5) * pw, lo + (hi - lo) / 2 - len / 2, 0); br.rotation.z = sgn * Math.atan2(pw, hi - lo); f.add(br); } }
           }
         }
-        { const fnd = RC.Aging.foundation(THREE, W, D, 0.45, GRAN, seedB * 100); grp.add(fnd); aged.push([RC.age(THREE, fnd.material, { kind: 1, top: 0.45, seed: seedB }), -0.1]); }   // a foundation of small stone blocks
+        { const fnd = RC.Aging.foundation(THREE, W, D, 0.45, GRAN, seedB * 100, [(b.door ? b.door.x - cx : 0) - 0.75, (b.door ? b.door.x - cx : 0) + 0.75]); grp.add(fnd); aged.push([RC.age(THREE, fnd.material, { kind: 1, top: 0.45, seed: seedB }), -0.1]); }   // a foundation of small stone blocks
         if (b.chimney) { const cw = st.bigChimney ? 1 : 0.6, chH = st.roof + 1.2, cm = stoneM(cw, chH); aged.push([RC.age(THREE, cm, { kind: 1, top: st.h + chH, seed: seedB * 7 }), st.h + 0.2]); chimneys.push({ lx: W * 0.28, ly: st.h + chH + 0.35, lz: -D * 0.15, big: !!st.bigChimney, seed: seedB }); grp.add(box(cw, chH, cw, cm, W * 0.28, st.h, -D * 0.15)); grp.add(box(cw + 0.16, 0.12, cw + 0.16, cm, W * 0.28, st.h + chH, -D * 0.15)); grp.add(cyl(0.1, 0.12, 0.28, M('#9a5a3a'), 8, W * 0.28, st.h + chH + 0.12, -D * 0.15)); if (st.bigChimney) grp.add(box(0.6, 0.15, 0.6, mats.glow, W * 0.28, st.h + st.roof + 1.2, -D * 0.15)); }
         // front: door and windows (glowing at night)
         const front = D / 2 + 0.01, dx = b.door ? b.door.x - cx : 0;
-        const DH = 2.02, holes = [[dx - 0.85, -0.2, dx + 0.85, DH + 0.4]], stoneWall = upperKind !== 'timber' || lowerKind, REV = 0.24;   // (REV: how far the frame stands out: the door sits back in it)
-        for (let k = 0; k < 5; k++) grp.add(box(0.188, DH - 0.01 - rB() * 0.02, 0.05, doorM, dx - 0.4 + k * 0.2, 0.01, front + 0.03));   // boards, a hair apart
-        grp.add(box(1.0, DH, 0.02, mats.glass, dx, 0, front + 0.012));   // (dark behind the gaps)
-        for (const [w2, y2] of [[0.9, 0.18], [0.9, DH * 0.5], [0.9, DH - 0.3]]) grp.add(box(w2, 0.1, 0.035, doorM, dx, y2, front + 0.07));   // ledges across the back of the boards (seen at the front: the old way)
+        // the doorway: the floor inside is the top of the foundation (FT), so the door starts there; stone steps lead up to it
+        const FT = 0.32, DH = Math.min(2.0, st.h - FT - 0.5), holes = [[dx - 0.85, -0.2, dx + 0.85, FT + DH + 0.4]], stoneWall = upperKind !== 'timber' || lowerKind, REV = 0.24;   // (REV: how far the frame stands out: the door sits back in it)
+        for (let k = 0; k < 5; k++) grp.add(box(0.188, DH - 0.01 - rB() * 0.02, 0.05, doorM, dx - 0.4 + k * 0.2, FT + 0.01, front + 0.03));   // boards, a hair apart
+        grp.add(box(1.0, DH + FT, 0.02, mats.glass, dx, 0, front + 0.012));   // (dark behind the gaps)
+        for (const y2 of [0.18, DH * 0.5, DH - 0.3]) grp.add(box(0.9, 0.1, 0.035, doorM, dx, FT + y2, front + 0.07));   // ledges across the boards
         if (stoneWall) {   // jambs of dressed stone blocks, long and short in turn, and a lintel with a keystone
-          for (const s of [-1, 1]) for (let y = 0, k = 0; y < DH - 0.05; k++) { const bh = Math.min(0.32 + rB() * 0.1, DH - y), bw = k % 2 ? 0.24 : 0.36, jb = new THREE.Mesh(RC.roughBox(THREE, bw, bh - 0.015, REV + 0.06, 0.025, rB), GRANM); jb.position.set(dx + s * (0.5 + bw / 2), y + bh / 2, front + REV / 2 - 0.02); grp.add(jb); y += bh; }
-          const ln = new THREE.Mesh(RC.roughBox(THREE, 1.75, 0.32, REV + 0.08, 0.03, rB), GRANM); ln.position.set(dx, DH + 0.16, front + REV / 2 - 0.01); grp.add(ln);
-          const ks = new THREE.Mesh(RC.roughBox(THREE, 0.24, 0.38, REV + 0.12, 0.02, rB), GRANM); ks.position.set(dx, DH + 0.18, front + REV / 2); grp.add(ks);
+          for (const s of [-1, 1]) for (let y = FT, k = 0; y < FT + DH - 0.05; k++) { const bh = Math.min(0.32 + rB() * 0.1, FT + DH - y), bw = k % 2 ? 0.24 : 0.36, jb = new THREE.Mesh(RC.roughBox(THREE, bw, bh - 0.015, REV + 0.06, 0.025, rB), GRANM); jb.position.set(dx + s * (0.5 + bw / 2), y + bh / 2, front + REV / 2 - 0.02); grp.add(jb); y += bh; }
+          const ln = new THREE.Mesh(RC.roughBox(THREE, 1.75, 0.32, REV + 0.08, 0.03, rB), GRANM); ln.position.set(dx, FT + DH + 0.16, front + REV / 2 - 0.01); grp.add(ln);
+          const ks = new THREE.Mesh(RC.roughBox(THREE, 0.24, 0.38, REV + 0.12, 0.02, rB), GRANM); ks.position.set(dx, FT + DH + 0.18, front + REV / 2); grp.add(ks);
         } else {   // heavy oak posts and a lintel beam, pegged
-          for (const s of [-1, 1]) grp.add(box(0.18, DH, REV, beamM, dx + s * 0.59, 0, front + REV / 2 - 0.02));
-          grp.add(box(1.6, 0.24, REV + 0.04, beamM, dx, DH, front + REV / 2 - 0.02));
-          for (const s of [-1, 1]) { const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.02, 8).rotateX(Math.PI / 2), mats.darkWood); peg.position.set(dx + s * 0.59, DH + 0.12, front + REV + 0.02); grp.add(peg); }
+          for (const s of [-1, 1]) grp.add(box(0.18, DH, REV, beamM, dx + s * 0.59, FT, front + REV / 2 - 0.02));
+          grp.add(box(1.6, 0.24, REV + 0.04, beamM, dx, FT + DH, front + REV / 2 - 0.02));
+          for (const s of [-1, 1]) { const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.02, 8).rotateX(Math.PI / 2), mats.darkWood); peg.position.set(dx + s * 0.59, FT + DH + 0.12, front + REV + 0.02); grp.add(peg); }
         }
-        { const th = new THREE.Mesh(RC.roughBox(THREE, 1.04, 0.07, REV + 0.04, 0.015, rB), GRANM); th.position.set(dx, 0.0, front + REV / 2); grp.add(th); }   // the threshold, worn
-        // worn stone steps: three half-round treads fanning out from the door, edges rounded like river stone, each dished where feet land
-        for (const [rad, top, depth] of [[1.0, 0.04, 0.55], [1.45, -0.1, 0.45], [1.95, -0.22, 0.4]]) {
-          const prof = [[0, top], [rad - 0.12, top], [rad - 0.05, top - 0.025], [rad, top - 0.09], [rad, -0.7]].map(([x, y]) => new THREE.Vector2(x, y));
-          const sg = new THREE.LatheGeometry(prof, 40, -Math.PI / 2, Math.PI), sp = sg.attributes.position, sd = rB() * 6;
-          for (let i = 0; i < sp.count; i++) { const x = sp.getX(i), y = sp.getY(i), z = sp.getZ(i), a = Math.atan2(x, z), k = 1 + 0.035 * Math.sin(a * 5 + sd);
-            const dish = y > top - 0.04 ? 0.03 * Math.exp(-(x * x) / 0.35) * Math.exp(-(z * z) / (rad * rad * 0.5)) : 0;
-            sp.setXYZ(i, x * k, y - dish, z * k * depth / 0.5 * 0.5); }
-          sg.computeVertexNormals(); const st2 = new THREE.Mesh(sg, GRANM); st2.position.set(dx, 0, front); st2.castShadow = st2.receiveShadow = true; grp.add(st2);
-        }
+        // the steps: two treads of rough stone, each a normal step (about 16 cm up, 35 cm deep), the top one level with the threshold,
+        // both a little wider than the doorway and running down into the ground; worn smooth and dipped in the middle where feet go
+        const stepT = (w, top, z0, z1) => { const g2 = RC.roughBox(THREE, w, top + 0.5, z1 - z0, 0.03, rB), sp = g2.attributes.position, hh = (top + 0.5) / 2;
+          for (let i = 0; i < sp.count; i++) if (sp.getY(i) > hh - 0.01) sp.setY(i, sp.getY(i) - 0.018 * Math.exp(-(sp.getX(i) * sp.getX(i)) / 0.12));
+          g2.computeVertexNormals(); const m = new THREE.Mesh(g2, GRANM); m.position.set(dx, top - hh, (z0 + z1) / 2); m.castShadow = m.receiveShadow = true; grp.add(m); };
+        stepT(1.5, FT, front - 0.02, front + REV + 0.36);   // the top step, under the door and out past the frame
+        stepT(1.85, FT / 2, front + REV + 0.36, front + REV + 0.72);
         const hood = rB() < 0.55;
         if (hood) {   // a small pent hood over the door: boards sloping away from the wall, an edge board, and two straight struts back to the wall
           const hm = roofM.clone(); if (hm.map) { hm.map = roofM.map.clone(); hm.map.needsUpdate = true; hm.map.repeat.set(1.9 / rt.m, 0.9 / rt.m); } if (hm.normalMap) { hm.normalMap = roofM.normalMap.clone(); hm.normalMap.needsUpdate = true; hm.normalMap.repeat.set(1.9 / rt.m, 0.9 / rt.m); }
-          const hw = 1.9, hd = 0.95, hy = 2.5, hr = new THREE.Mesh(new THREE.BoxGeometry(hw, 0.07, hd), hm), tilt = 0.32;
+          const hw = 1.9, hd = 0.95, hy = FT + DH + 0.44, hr = new THREE.Mesh(new THREE.BoxGeometry(hw, 0.07, hd), hm), tilt = 0.32;
           hr.rotation.x = tilt; hr.position.set(dx, hy - Math.sin(tilt) * hd / 2, front + Math.cos(tilt) * hd / 2 + 0.03); hr.castShadow = true; grp.add(hr); fadeMats.push(hm);
           const edge = box(hw + 0.06, 0.1, 0.05, beamM, dx, hy - Math.sin(tilt) * hd - 0.1, front + Math.cos(tilt) * hd + 0.03); grp.add(edge);   // the edge board
           const back = box(hw + 0.06, 0.14, 0.06, beamM, dx, hy - 0.04, front + 0.04); grp.add(back);   // a rail where it meets the wall
           for (const sx of [-0.8, 0.8]) { const len = Math.hypot(0.8, 0.55), st3 = box(0.07, len, 0.07, beamM), ang2 = Math.atan2(0.8, 0.55); st3.rotation.x = ang2; st3.position.set(dx + sx, hy - 0.55 - 0.04, front + 0.5); st3.position.y = hy - 0.5 - len / 2 + 0.3; grp.add(st3); }
         }
-        for (const sy of [0.42, DH - 0.42]) { grp.add(box(0.78, 0.055, 0.02, mats.iron, dx - 0.08, sy, front + 0.09)); const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), mats.iron); knob.position.set(dx - 0.47, sy + 0.027, front + 0.1); grp.add(knob); }   // strap hinges
-        { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.065, 0.012, 6, 14), mats.iron); ring.position.set(dx + 0.3, 1.0, front + 0.11); grp.add(ring); const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.012, 10).rotateX(Math.PI / 2), mats.iron); plate.position.set(dx + 0.3, 1.07, front + 0.1); grp.add(plate); }
+        for (const sy of [FT + 0.42, FT + DH - 0.42]) { grp.add(box(0.78, 0.055, 0.02, mats.iron, dx - 0.08, sy, front + 0.09)); const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), mats.iron); knob.position.set(dx - 0.47, sy + 0.027, front + 0.1); grp.add(knob); }   // strap hinges
+        { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.065, 0.012, 6, 14), mats.iron); ring.position.set(dx + 0.3, FT + 1.0, front + 0.11); grp.add(ring); const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.012, 10).rotateX(Math.PI / 2), mats.iron); plate.position.set(dx + 0.3, FT + 1.07, front + 0.1); grp.add(plate); }
         const shutters = st.wall === 'timber' || st.wall === 'plaster', shutM = RC.age(THREE, woodM(['#6a8aa8', '#7a9a6a', '#a85a44', '#7a7a8a', '#5a7a6a'][Math.floor(RC.hash(b.x, b.z, 29) * 5)], 0.3, 0.6), { kind: 2, seed: seedB * 3 }); aged.push([shutM, 0]);
         const curt = rB() < 0.75 ? [curtainMats[Math.floor(rB() * curtainMats.length)]] : null;
         const sill = stoneM(1.1, 0.12), flowersM = [M('#d94a6a'), M('#f2c94c'), M('#ffffff'), M('#9b59d0')];
@@ -188,7 +186,35 @@
         if (st.columns) { const sm = WT.darkstone.map ? M('#efe8dc', { map: rep(WT.darkstone.map, 0.6, st.h / 2.4), normalMap: rep(WT.darkstone.normalMap, 0.6, st.h / 2.4), roughness: 0.9 }) : M('#e8e2d4');
           for (let i = 0; i < 4; i++) { const px = -W / 2 + 1 + i * ((W - 2) / 3); grp.add(box(0.62, 0.22, 0.62, sm, px, 0, front + 0.55)); grp.add(cyl(0.22, 0.26, st.h - 0.5, sm, 14, px, 0.22, front + 0.55)); grp.add(box(0.6, 0.28, 0.6, sm, px, st.h - 0.28, front + 0.55)); } }
         if (st.wing) { const wg = box(3.2, st.h - 0.8, D * 0.6, wallM, W / 2 + 1.4, 0, -D * 0.15); grp.add(wg); const wr = roof(D * 0.6, 3.2, 1.3, roofM, wallM, rt, ridgeTint); wr.rotation.y = Math.PI / 2; wr.position.set(W / 2 + 1.4, st.h - 0.8, -D * 0.15); grp.add(wr); fadeMats.push(...wr.userData.mats); }
-        if (st.glasshouse) { const gm = new THREE.MeshStandardMaterial({ color: '#bfe8d0', transparent: true, opacity: 0.45, roughness: 0.1 }); grp.add(box(2.6, 2.0, D * 0.7, gm, -W / 2 - 1.3, 0, 0)); }
+        if (st.glasshouse) {   // a glasshouse on the side: a low brick wall, white-painted glazing bars, small panes, a glass roof with a ridge, plants inside on staging and in pots
+          const GW = 2.6, GD = D * 0.72, GH = 2.0, RH = 0.9, gx = -W / 2 - GW / 2 - 0.02, base = 0.5, bars = M('#eeeae0', { roughness: 0.6 });
+          const glass = new THREE.MeshStandardMaterial({ color: '#d8ece4', transparent: true, opacity: 0.16, roughness: 0.04, metalness: 0.1, envMapIntensity: 1.6, depthWrite: false, side: THREE.DoubleSide });
+          const bm = WT.brick && WT.brick.map ? M('#ffffff', { map: rep(WT.brick.map, 3, 0.25), normalMap: rep(WT.brick.normalMap, 3, 0.25) }) : M('#9a5a44');
+          const gh = new THREE.Group(); gh.position.set(gx, 0, 0); grp.add(gh);
+          for (const [w2, d2, x2, z2] of [[GW, 0.22, 0, GD / 2], [GW, 0.22, 0, -GD / 2], [0.22, GD, -GW / 2, 0]]) gh.add(box(w2, base, d2, bm, x2, 0, z2));   // the low wall
+          { const cm = M('#d8d0c0'); for (const [w2, d2, x2, z2] of [[GW + 0.06, 0.28, 0, GD / 2], [GW + 0.06, 0.28, 0, -GD / 2], [0.28, GD, -GW / 2, 0]]) gh.add(box(w2, 0.06, d2, cm, x2, base, z2)); }   // its coping
+          gh.add(box(GW - 0.2, 0.03, GD - 0.2, bm, 0, 0.01, 0));   // a brick floor
+          const pane = (w2, h2, x2, y2, z2, ry) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(w2, h2), glass); p.position.set(x2, y2, z2); p.rotation.y = ry; gh.add(p); };
+          const wallH = GH - base;
+          for (const [span, fx, fz, ry] of [[GW, 0, GD / 2, 0], [GW, 0, -GD / 2, 0], [GD, -GW / 2, 0, Math.PI / 2]]) {   // three glazed sides (the fourth is the house)
+            const n = Math.round(span / 0.45); pane(span, wallH, fx, base + wallH / 2, fz, ry);
+            for (let i = 0; i <= n; i++) { const o = -span / 2 + (i / n) * span, b2 = box(0.05, wallH, 0.05, bars, ry ? fx : fx + o, base, ry ? fz + o : fz); gh.add(b2); }
+            for (const yy of [base + wallH * 0.5, GH - 0.03]) gh.add(box(ry ? 0.05 : span, 0.05, ry ? span : 0.05, bars, fx, yy, fz));
+          }
+          // the roof: two glass slopes from the eaves up to a ridge, with rafters
+          const half = GD / 2, ang = Math.atan2(RH, half), Ls = Math.hypot(half, RH);
+          for (const s of [-1, 1]) { const rp = new THREE.Mesh(new THREE.BoxGeometry(GW, 0.01, Ls), glass); rp.rotation.x = s * ang; rp.position.set(0, GH + RH / 2, s * half / 2); gh.add(rp);
+            for (let i = 0, n = Math.round(GW / 0.45); i <= n; i++) { const rf2 = box(0.045, 0.05, Ls, bars); rf2.rotation.x = s * ang; rf2.position.set(-GW / 2 + (i / n) * GW, GH + RH / 2 - 0.02, s * half / 2); gh.add(rf2); } }
+          gh.add(box(GW + 0.1, 0.08, 0.08, bars, 0, GH + RH - 0.04, 0));   // the ridge
+          { const tri = new THREE.Shape(); tri.moveTo(-half, 0); tri.lineTo(half, 0); tri.lineTo(0, RH); const gt = new THREE.Mesh(new THREE.ShapeGeometry(tri), glass); gt.rotation.y = Math.PI / 2; gt.position.set(-GW / 2, GH, 0); gh.add(gt); }   // the glazed gable end
+          // inside: slatted staging along the back with trays of seedlings, and big pots on the floor
+          gh.add(box(GW - 0.4, 0.05, 0.5, beamM, 0.05, 0.85, -GD / 2 + 0.4)); for (const lx of [-GW / 2 + 0.35, GW / 2 - 0.3]) gh.add(box(0.05, 0.85, 0.45, beamM, lx, 0, -GD / 2 + 0.4));
+          for (let i = 0; i < 3; i++) { const pl = RC.Aging.planter(THREE, 0.62, beamM, seedB * 70 + i, [['#f0f0f0', '#e8d0f0'], ['#f2c94c'], ['#e04060']][i]); pl.position.set(-0.7 + i * 0.72, 0.9, -GD / 2 + 0.4); gh.add(pl); }
+          const potM = M('#b0603a', { roughness: 0.9 });
+          for (let i = 0; i < 4; i++) { const px = -GW / 2 + 0.5 + i * 0.6, pz = GD / 2 - 0.45 - (i % 2) * 0.25, pot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.14, 0.32, 12), potM); pot.position.set(px, 0.16, pz); gh.add(pot);
+            const pl = RC.Aging.planter(THREE, 0.3, potM, seedB * 90 + i, i % 2 ? null : [['#ff8040', '#f0d040']][0]); pl.position.set(px, 0.15, pz); pl.scale.set(1.3, 2.2, 1.3); pl.children.slice(0, 5).forEach((c) => (c.visible = false)); gh.add(pl); }
+          gh.traverse((o) => { if (o.isMesh && o.material !== glass) { o.castShadow = true; o.receiveShadow = true; } });
+        }
         if (st.barrels) {   // real barrels: bulging oak staves, iron hoops, a lid; different sizes, one tipped on its side, set against the wall
           const sd = RC.rng(seedB * 13 + 7), prof = (h2, r0, r1) => { const pts = []; for (let i = 0; i <= 10; i++) { const t = i / 10, bulge = Math.sin(t * Math.PI); pts.push(new THREE.Vector2(r0 + (r1 - r0) * bulge * 1.0 + 0.0, t * h2)); } return pts; };
           [[0, 0.62, 0.27, 0.34, false], [0.72, 0.5, 0.25, 0.31, false], [1.38, 0.32, 0.23, 0.29, true]].forEach(([ox, h2, r0, r1, side], bi) => {
@@ -372,6 +398,13 @@
             if (ft.fill) { const fm = new THREE.Mesh(ft.fill, floraMats.fillMat(sp.leaf)); fm.castShadow = true; o.add(fm); }
             const ap = M('#c8321e', { roughness: 0.45 });
             for (let i = 0; i < 9; i++) { const a = RC.hash(i, 7, 7) * 6.28, rr = 0.45 + RC.hash(i, 8, 8) * 0.55, s = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), ap); s.position.set(Math.cos(a) * rr, 1.2 + RC.hash(i, 9, 9) * 0.8, Math.sin(a) * rr); o.add(s); } }
+          else if (n === 'berry_bush') {   // a real leafy bush (same maker as the shrubs) with berries clustered in the foliage
+            const fb = RC.Flora.bush(THREE, 'berry', Math.floor(t.x * 7 + t.z) + 11, 1), tint = new THREE.Color(fb.color), lm = floraMats.leafMat(fb.leaf, 0.06), lf = new THREE.Mesh(fb.leaves, lm); lf.customDepthMaterial = lm.userData.depth;
+            for (const geo of [fb.leaves, fb.fill]) { if (!geo) continue; const c = geo.attributes.color; for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) * tint.r, c.getY(i) * tint.g, c.getZ(i) * tint.b); }
+            o.add(lf); if (fb.fill) { const fm = new THREE.Mesh(fb.fill, floraMats.fillMat(fb.leaf)); fm.castShadow = true; o.add(fm); } if (fb.bark) { const bk = new THREE.Mesh(fb.bark, floraMats.barkMat('oak')); bk.castShadow = true; o.add(bk); }
+            const bm = M(['#6a2a7a', '#b0203a'][Math.floor(RC.hash(t.x, t.z, 3) * 2)], { roughness: 0.35 });
+            for (let i = 0; i < 16; i++) { const a = RC.hash(i, 1, 71) * 6.28, rr = 0.22 + RC.hash(i, 2, 71) * 0.3, b = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), bm); b.position.set(Math.cos(a) * rr, 0.18 + RC.hash(i, 3, 71) * 0.4, Math.sin(a) * rr); o.add(b); }
+            o.scale.setScalar(1.15); }
           else { const c = { herb_patch: '#5fbf5a', berry_bush: '#2f7d32', mushroom_ring: '#d9b38c', beehive_log: '#b7791f', relic_scrap: '#8c8f99' }[n] || '#5fbf5a'; for (let i = 0; i < 5; i++) { const s = new THREE.Mesh(n === 'mushroom_ring' ? new THREE.ConeGeometry(0.09, 0.12, 7) : new THREE.SphereGeometry(0.09, 6, 4), M(c)); const a = i * 1.26; s.position.set(Math.cos(a) * 0.25, 0.1, Math.sin(a) * 0.25); o.add(s); } }
           return o; },
         station: (t) => { const o = new THREE.Group();
