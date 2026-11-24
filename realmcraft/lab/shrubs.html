@@ -20,6 +20,8 @@
 <div class="bar" id="bar"><b>SHRUB LAB</b></div>
 <div class="help">drag to turn · right-drag or Shift-drag to move · wheel to zoom (right up close) · click a name to go to it</div>
 <script src="../lib/realm-libs.js"></script>
+<script src="../assets/tex/bark_brown.js"></script>
+<script src="../assets/tex/bark_pine.js"></script>
 <script src="../js/rc-core.js"></script>
 <script src="../js/rc-textures.js"></script>
 <script src="../js/rc-flora.js"></script>
@@ -51,7 +53,7 @@
     const lm = mats.leafMat(b.leaf, k.includes('fern') ? 0.12 : 0.06).clone(); lm.color.set(b.color); lm.onBeforeCompile = mats.leafMat(b.leaf, k.includes('fern') ? 0.12 : 0.06).onBeforeCompile; lm.customProgramCacheKey = () => 'lab' + k;
     const lmesh = new T.Mesh(b.leaves, lm); lmesh.castShadow = lmesh.receiveShadow = true; lmesh.customDepthMaterial = new T.MeshDepthMaterial({ map: lm.map, alphaTest: 0.42, depthPacking: T.RGBADepthPacking }); grp.add(lmesh);
     if (b.fill) { const fm = mats.fillMat(b.leaf).clone(); fm.color.set(b.color); fm.onBeforeCompile = mats.fillMat(b.leaf).onBeforeCompile; fm.customProgramCacheKey = () => 'labf' + k; const f = new T.Mesh(b.fill, fm); f.castShadow = f.receiveShadow = true; grp.add(f); }
-    if (b.bark) { const s = new T.Mesh(b.bark, mats.barkMat('birch')); s.castShadow = true; grp.add(s); }
+    if (b.bark) { const s = new T.Mesh(b.bark, mats.barkMat(k === 'sapling' ? 'birch' : 'oak')); s.castShadow = true; grp.add(s); }
     grp.position.set(x, 0, 0); scene.add(grp); spots.push({ k, x, grp });
     const tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = k.replace('_', ' '); document.body.append(tag); tags.push(tag);
   });

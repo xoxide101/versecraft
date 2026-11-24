@@ -111,6 +111,22 @@
       for (let i = 0; i < n; i++) { const p = new T.PlaneGeometry(0.42, 0.95); p.translate(0, 0.47, 0); p.rotateX(0.55 + r() * 0.5); p.rotateY((i / n) * 6.28 + r() * 0.4); const pos = p.attributes.position, nor = p.attributes.normal, col = new Float32Array(pos.count * 3), k = 0.8 + r() * 0.3; for (let j = 0; j < pos.count; j++) { const l = Math.hypot(pos.getX(j), 1, pos.getZ(j)); nor.setXYZ(j, pos.getX(j) / l, 1 / l, pos.getZ(j) / l); col[j * 3] = col[j * 3 + 1] = col[j * 3 + 2] = k; } p.setAttribute('color', new T.BufferAttribute(col, 3)); out.push(p); }
       return { leaves: T.BufferGeometryUtils.mergeGeometries(out), leaf: 'fern', color: b.color };
     }
+    if (kind !== 'box' && kind !== 'sapling') {   // built like a little tree: woody stems fanning up from the ground, forking, leaf clusters at the tips
+      const R0 = b.r, size = b.size || 0.42, mid = V3(0, R0 * 0.85, 0), n = 4 + Math.floor(r() * 3), per = Math.max(4, Math.round(b.cards * 5.4 * Math.max(0.6, detail) / (n * 2.2)));   // (no solid cores in a shrub: more leaves instead)
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * 6.28 + r() * 0.8, lean = 0.3 + r() * 0.45, len = R0 * (1.05 + r() * 0.55), base = V3(Math.cos(a) * 0.04, -0.02, Math.sin(a) * 0.04);
+        const midP = V3(base.x + Math.cos(a) * lean * len * 0.45, len * 0.5, base.z + Math.sin(a) * lean * len * 0.45);
+        const tip = V3(base.x + Math.cos(a) * lean * len * (0.95 + r() * 0.3), len * (0.85 + r() * 0.3), base.z + Math.sin(a) * lean * len * (0.95 + r() * 0.3));
+        stems.push(limb(T, base, midP, 0.032, 0.024, 5), limb(T, midP, tip, 0.024, 0.01, 5));
+        const fa = a + (r() < 0.5 ? -1 : 1) * (0.5 + r() * 0.5), fl = len * (0.35 + r() * 0.25), fork = V3(midP.x + Math.cos(fa) * fl, midP.y + fl * (0.4 + r() * 0.4), midP.z + Math.sin(fa) * fl);
+        stems.push(limb(T, midP, fork, 0.018, 0.008, 4));
+        cluster(T, tip, R0 * (0.38 + r() * 0.14), per + 2, size * 1.05, mid, r, out, 1, null);
+        cluster(T, fork, R0 * (0.28 + r() * 0.1), per, size * 0.95, mid, r, out, 1, null);
+        if (r() < 0.6) cluster(T, V3((midP.x + tip.x) / 2, (midP.y + tip.y) / 2, (midP.z + tip.z) / 2), R0 * 0.25, Math.max(2, per - 2), size * 0.9, mid, r, out, 1, null);
+      }
+      const M = (a) => T.BufferGeometryUtils.mergeGeometries(a.map((g) => (g.index ? g.toNonIndexed() : g)));
+      return { leaves: M(out), fill: fill.length ? M(fill) : null, bark: stems.length ? M(stems) : null, leaf: b.leaf, color: b.color };
+    }
     const R0 = b.r, st = b.stem || 0, mid = V3(0, R0 * 0.72 + st, 0), Z = new T.Vector3(0, 0, 1), size = b.size || 0.42;
     if (st) stems.push(limb(T, V3(0, -0.05, 0), V3(0, st + 0.2, 0), 0.04, 0.02, 5));
     // a real shrub is lumpy: a main mass and 2-4 smaller lobes, uneven in size and height (a box stays tidier)
@@ -235,7 +251,7 @@
       list.forEach(([x, z, h], i) => { const s = scale[0] + h * (scale[1] - scale[0]); m.setMatrixAt(i, tm.compose(ps.set(x, Y(x, z), z), qu.setFromAxisAngle(up, h * 50), sc.set(s, s, s))); if (tint) m.setColorAt(i, col.set(tint).offsetHSL((h - 0.5) * 0.04, 0, (h - 0.5) * 0.12)); });
       m.castShadow = castShadow; m.receiveShadow = true; g.add(m); return m;
     };
-    for (const kind of ['bush', 'berry', 'blossom', 'fern', 'sapling']) { const b = RC.Flora.bush(T, kind, 3, detail); plantSet(brush[kind], b.leaves, mats.leafMat(b.leaf, kind === 'fern' ? 0.12 : 0.06), [0.75, 1.25], b.color); if (b.fill) plantSet(brush[kind], b.fill, mats.fillMat(b.leaf), [0.75, 1.25], b.color); if (b.bark) plantSet(brush[kind], b.bark, mats.barkMat('birch'), [0.75, 1.25]); }
+    for (const kind of ['bush', 'berry', 'blossom', 'fern', 'sapling']) { const b = RC.Flora.bush(T, kind, 3, detail); plantSet(brush[kind], b.leaves, mats.leafMat(b.leaf, kind === 'fern' ? 0.12 : 0.06), [0.75, 1.25], b.color); if (b.fill) plantSet(brush[kind], b.fill, mats.fillMat(b.leaf), [0.75, 1.25], b.color); if (b.bark) plantSet(brush[kind], b.bark, mats.barkMat(kind === 'sapling' ? 'birch' : 'oak'), [0.75, 1.25]); }
     // reeds and grass: crossed cards
     const clump = (w, h, n) => { const parts = []; for (let i = 0; i < n; i++) { const p = new T.PlaneGeometry(w, h, 1, 3).translate(0, h / 2, 0), pp = p.attributes.position, col = new Float32Array(pp.count * 3); for (let j = 0; j < pp.count; j++) { const t = pp.getY(j) / h; pp.setZ(j, t * t * h * 0.28); col[j * 3] = col[j * 3 + 1] = col[j * 3 + 2] = 0.72 + t * 0.4; } p.rotateY((i / n) * Math.PI * 2 + 0.3); p.setAttribute('color', new T.BufferAttribute(col, 3)); const nor = p.attributes.normal; for (let j = 0; j < nor.count; j++) nor.setXYZ(j, 0, 1, 0); parts.push(p); } return T.BufferGeometryUtils.mergeGeometries(parts); };
     const crossed = (w, h, n) => { const parts = []; for (let i = 0; i < n; i++) { const p = new T.PlaneGeometry(w, h).translate(0, h / 2, 0); p.rotateY((i / n) * Math.PI); const nor = p.attributes.normal; for (let j = 0; j < nor.count; j++) nor.setXYZ(j, 0, 1, 0); parts.push(p); } return T.BufferGeometryUtils.mergeGeometries(parts); };
