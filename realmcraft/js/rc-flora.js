@@ -212,7 +212,7 @@
     const at = (c, r) => (r < 0 || r >= H || c < 0 || c >= W ? 'T' : P[r][c]);
     const noise = (c, r, s) => (RC.hash(Math.floor(c / s), Math.floor(r / s), 77) + RC.hash(Math.floor(c / (s * 2)), Math.floor(r / (s * 2)), 78)) / 2;
     // where each species grows: pines toward the north edge, birch in clumps, oak and maple elsewhere
-    const spots = realm.things.filter((t) => t.kind !== 'building' && t.kind !== 'boat' && t.kind !== 'lamp').map((t) => [t.x, t.z]);
+    const spots = realm.things.filter((t) => t.kind !== 'building' && t.kind !== 'boat' && t.kind !== 'lamp' && t.node !== 'mushroom').map((t) => [t.x, t.z]);   // (mushrooms grow among trees, they don't push them away)
     const clear = (x, z) => !spots.some(([sx, sz]) => Math.abs(sx - x) < 1.3 && Math.abs(sz - z) < 1.3);
     const trees = { oak: [], maple: [], birch: [], pine: [] };
     for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (P[r][c] === 'T') {

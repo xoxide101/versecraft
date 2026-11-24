@@ -163,7 +163,8 @@
           haloMat: new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(halo), color: '#ffffff', blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 }),
         };
       })());
-      const floraMats = RC.Flora.materials(THREE, shared);
+      const floraMats = RC.Flora.materials(THREE, shared), mushMats = {}, glowMats = new Set();
+      tickers.push((t2, s) => { for (const m of glowMats) m.emissiveIntensity = s.night * (1.1 + Math.sin(t2 * 1.3) * 0.2); });   // glowcaps glow at night
       const make = {
         lamp: (th) => {   // a cast-iron street lamp: stone plinth, fluted post with rings, a scrolled arm, a glazed lantern with a candle inside
           const o = new THREE.Group(), L = lampParts();
@@ -209,7 +210,8 @@
           const tint0 = new THREE.Color(fb.color), lm = floraMats.leafMat(fb.leaf, 0.06), o = new THREE.Group(), m = new THREE.Mesh(fb.leaves, lm); m.customDepthMaterial = lm.userData.depth; o.add(m); if (fb.bark) { const bk = new THREE.Mesh(fb.bark, floraMats.barkMat('oak')); bk.castShadow = true; o.add(bk); } if (fb.fill) { const fm = new THREE.Mesh(fb.fill, floraMats.fillMat(fb.leaf)); fm.castShadow = true; o.add(fm); const fc = fb.fill.attributes.color; for (let i = 0; i < fc.count; i++) fc.setXYZ(i, fc.getX(i) * tint0.r, fc.getY(i) * tint0.g, fc.getZ(i) * tint0.b); }
           const tint = new THREE.Color(fb.color), c = fb.leaves.attributes.color; for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) * tint.r, c.getY(i) * tint.g, c.getZ(i) * tint.b); o.scale.setScalar(1.15); return o; },
         chest: () => { const o = new THREE.Group(); o.add(box(0.7, 0.4, 0.45, M('#8b5a2b'))); const lid = box(0.72, 0.16, 0.47, M('#6b4226'), 0, 0.4, 0); lid.name = 'lid'; o.add(lid); o.add(box(0.12, 0.14, 0.05, mats.brass, 0, 0.32, 0.24)); return o; },
-        forage: (t) => { const o = new THREE.Group(); const n = t.node;
+        forage: (t) => { if (t.node === 'mushroom') { const o = RC.Mushrooms.cluster(THREE, t.mush, Math.floor(t.x * 13 + t.z * 7), mushMats); if (t.onTrunk) o.rotation.y = Math.atan2(Math.cos(t.face), Math.sin(t.face)); if (o.userData.glowMat) glowMats.add(o.userData.glowMat); return o; }
+          const o = new THREE.Group(); const n = t.node;
           if (/vein/.test(n)) { const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 0), M('#7b7f86', { flatShading: true })); rock.position.y = 0.25; o.add(rock); for (let i = 0; i < 4; i++) { const s = new THREE.Mesh(new THREE.OctahedronGeometry(0.08), M(n.startsWith('silver') ? '#e5e7eb' : n.startsWith('obsidian') ? '#1f1530' : '#b4693a', { metalness: 0.6, roughness: 0.3 })); s.position.set((RC.hash(i, 1, 9) - 0.5) * 0.6, 0.3 + RC.hash(i, 2, 9) * 0.3, 0.3); o.add(s); } }
           else if (n === 'timber_pile') for (let i = 0; i < 3; i++) { const l = cyl(0.12, 0.12, 0.9, M('#8b5a2b'), 8); l.rotation.z = Math.PI / 2; l.position.set(0, 0.12 + (i === 2 ? 0.22 : 0) - 0.45, (i - 1) * 0.25 * (i === 2 ? 0 : 1)); o.add(l); }
           else if (n === 'fruit_tree') { o.add(cyl(0.08, 0.12, 1.2, M('#6b4226'), 6)); const c = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6, 0), M('#4ca04a', { flatShading: true })); c.position.y = 1.5; o.add(c); for (let i = 0; i < 5; i++) { const a = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 4), M('#dc2626')); a.position.set((RC.hash(i, 7, 7) - 0.5) * 0.9, 1.3 + RC.hash(i, 8, 8) * 0.5, (RC.hash(i, 9, 9) - 0.5) * 0.9); o.add(a); } }

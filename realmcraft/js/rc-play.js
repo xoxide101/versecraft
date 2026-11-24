@@ -11,13 +11,14 @@
       this.realm = realm;
       this.calendar = new RC.Calendar(realm.calendar);
       this.terrain = new RC.Terrain(realm.terrain, realm.w, realm.h);
+      if (RC.Mushrooms && !realm._mushrooms) { realm._mushrooms = true; realm.things.push(...RC.Mushrooms.spots(realm, this.terrain)); }   // mushrooms grow where the land suits them
       this.plan = RC.MapCraft.plan(realm, this.terrain);
       this.people = realm.people.map((d) => RC.Cast.person(d));
       this.players = realm.players.slice(0, 4).map((d) => Object.assign(RC.Cast.person(Object.assign({ age: 'adult', job: 'hero' }, d)), { isPlayer: true, gold: 220, bag: {} }));
       this.doors = this.plan.usable.filter((u) => u.kind === 'door');
       this.weather = 'breezy'; this.weatherT = 90; this.wind = { dir: 0.8, target: 0.8, speed: 13, t: 30 }; this.flash = 0; this.flashT = 5; this.shake = 0;
       this.yaw = 0; this.yawTarget = 0; this.viewMode = 'evo'; this.zoom = 1;
-      this.dialogue = null; this.target = null; this.toast = null;
+      this.dialogue = null; this.target = null; this.toast = null; this.lying = { wet: 0, snow: 0 };   // rain and snow lying about
     }
     get player() { return this.players[0]; }
     say(text, secs = 3) { this.toast = { text, t: secs }; }
@@ -37,7 +38,7 @@
       // ---- time and weather keys: T moves time on 3 hours, G changes the sky
       if (I.hit('t')) { this.calendar.add(3); const n = this.calendar.now(); this.say(`${n.weekdayName} · ${this.calendar.clock()} (${n.period})`, 2); }
       if (I.hit('g')) { this.setWeather(WEATHER[(WEATHER.indexOf(this.weather) + 1) % WEATHER.length]); }
-      this.calendar.step(dt); this.stepWeather(dt);
+      this.calendar.step(dt); this.stepWeather(dt); RC.weatherStep(this.lying, this.weather, dt);
       if (this.toast && (this.toast.t -= dt) <= 0) this.toast = null;
       this.shake = Math.max(0, this.shake - dt * 2);
       // ---- talking: Space moves on, Esc stops
@@ -101,7 +102,7 @@
         return;
       }
       if (u.kind === 'chest') { t.done = true; if (t._obj) { const lid = t._obj.getObjectByName('lid'); if (lid) { lid.rotation.x = -1.2; lid.position.z -= 0.15; lid.position.y += 0.15; } } if (/gold/i.test(t.reward)) pl.gold += t.amount || 50; else pl.bag[t.reward] = (pl.bag[t.reward] || 0) + 1; this.say(`The chest holds: ${t.reward}${t.amount ? ' ×' + t.amount : ''}.`); return; }
-      if (u.kind === 'forage') { t.done = true; if (t._obj) t._obj.scale.setScalar(0.5); pl.bag[t.name] = (pl.bag[t.name] || 0) + (t.amount || 1); this.say(`Gathered ${t.name} ×${t.amount || 1}.`); return; }
+      if (u.kind === 'forage') { t.done = true; if (t._obj) { if (t.node === 'mushroom') t._obj.visible = false; else t._obj.scale.setScalar(0.5); } pl.bag[t.name] = (pl.bag[t.name] || 0) + (t.amount || 1); this.say(`Gathered ${t.name} ×${t.amount || 1}${t.use ? ' (' + t.use + ')' : ''}.`); return; }
       if (u.kind === 'station') { this.dialogue = { who: { x: t.x, z: t.z }, name: t.title, lines: [t.subtitle, 'Crafting here comes in a later step: what you gather goes in your bag for now.'], i: 0 }; return; }
       if (u.kind === 'bell') { this.shake = 0.3; this.say('DONG… the bell rings out over the harbor.'); return; }
       this.dialogue = { who: { x: t.x, z: t.z }, name: t.title || u.name, lines: t.lines && t.lines.length ? t.lines : ['Nothing more to see.'], i: 0 };

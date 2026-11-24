@@ -79,24 +79,37 @@
         sh.uniforms.uScale = { value: new THREE.Vector4(...L.map((x) => U / x.meters[0])) };
         sh.vertexShader = 'varying vec3 vWp;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWp = (modelMatrix * vec4(transformed, 1.0)).xyz;');
         sh.fragmentShader = 'varying vec3 vWp; uniform sampler2D tSplat, tC0, tC1, tC2, tC3, tN0, tN1, tN2, tN3; uniform vec2 uSize; uniform vec4 uScale;\n' +
+          'float gH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
+          'float gN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(gH(i), gH(i + vec2(1, 0)), f.x), mix(gH(i + vec2(0, 1)), gH(i + vec2(1, 1)), f.x), f.y); }\n' +
           'vec2 luv(float s) { return vec2(vWp.x, -vWp.z) * s; }\n' +
           sh.fragmentShader
             .replace('#include <map_fragment>', `
               vec4 sp = texture2D(tSplat, vWp.xz / uSize);
-              // sharpen where a layer's stones stand proud (a little height-based blending)
-              float h0 = dot(texture2D(tC0, luv(uScale.x)).rgb, vec3(0.33));
-              sp.r = clamp(sp.r * (0.75 + h0 * 0.8), 0.0, 1.0);
+              vec3 grassC = texture2D(map, vMapUv).rgb;
+              // cobbles that don't repeat: a second, turned copy blended in by noise; each patch of stones its own tone
+              vec2 u0 = luv(uScale.x), u1 = vec2(u0.y, -u0.x) * 0.83 + 0.37;
+              float mixA = smoothstep(0.35, 0.65, gN(vWp.xz * 0.18));
+              vec3 cob = mix(texture2D(tC0, u0).rgb, texture2D(tC0, u1).rgb, mixA);
+              float stoneH = dot(cob, vec3(0.33));
+              cob *= 0.82 + 0.34 * gN(vWp.xz * 0.55 + 5.0);
+              // moss creeping over some stones, grass growing up through the gaps near the edges and here and there
+              cob = mix(cob, cob * vec3(0.72, 0.9, 0.55), smoothstep(0.6, 0.85, gN(vWp.xz * 0.33 + 9.0)) * 0.6);
+              float edge = 1.0 - smoothstep(0.5, 0.95, sp.r), wild = gN(vWp.xz * 0.9 + 3.0);
+              float grassIn = clamp((edge * 0.95 + wild * 0.4 - 0.32) * 1.7, 0.0, 1.0) * (1.0 - smoothstep(0.22, 0.42, stoneH));
+              cob = mix(cob, grassC * 0.85, grassIn);
+              // stones stand proud of the dirt and grass at the edges (height-based blending)
+              sp.r = clamp(sp.r * (0.7 + stoneH * 0.9), 0.0, 1.0);
               float wg = clamp(1.0 - sp.r - sp.g - sp.b - sp.a, 0.0, 1.0);
-              vec3 col = texture2D(map, vMapUv).rgb * wg + texture2D(tC0, luv(uScale.x)).rgb * sp.r + texture2D(tC1, luv(uScale.y)).rgb * sp.g + texture2D(tC2, luv(uScale.z)).rgb * sp.b + texture2D(tC3, luv(uScale.w)).rgb * sp.a;
+              vec3 col = grassC * wg + cob * sp.r + texture2D(tC1, luv(uScale.y)).rgb * sp.g + texture2D(tC2, luv(uScale.z)).rgb * sp.b + texture2D(tC3, luv(uScale.w)).rgb * sp.a;
               diffuseColor.rgb *= col;`)
             .replace('#include <normal_fragment_maps>', `
               #ifdef USE_NORMALMAP_TANGENTSPACE
-              vec3 mapN = (texture2D(normalMap, vNormalMapUv).xyz * 2.0 - 1.0) * wg + (texture2D(tN0, luv(uScale.x)).xyz * 2.0 - 1.0) * sp.r * 1.4 + (texture2D(tN1, luv(uScale.y)).xyz * 2.0 - 1.0) * sp.g + (texture2D(tN2, luv(uScale.z)).xyz * 2.0 - 1.0) * sp.b + (texture2D(tN3, luv(uScale.w)).xyz * 2.0 - 1.0) * sp.a;
+              vec3 mapN = (texture2D(normalMap, vNormalMapUv).xyz * 2.0 - 1.0) * wg + mix(texture2D(tN0, u0).xyz * 2.0 - 1.0, vec3(texture2D(tN0, u1).yx * vec2(1.0, -1.0) * 2.0 - vec2(1.0, -1.0), texture2D(tN0, u1).z * 2.0 - 1.0), mixA) * sp.r * 1.4 * (1.0 - grassIn * 0.7) + (texture2D(tN1, luv(uScale.y)).xyz * 2.0 - 1.0) * sp.g + (texture2D(tN2, luv(uScale.z)).xyz * 2.0 - 1.0) * sp.b + (texture2D(tN3, luv(uScale.w)).xyz * 2.0 - 1.0) * sp.a;
               mapN.z = max(mapN.z, 0.2); mapN.xy *= normalScale;
               normal = normalize(tbn * mapN);
               #endif`);
       };
-      base.customProgramCacheKey = () => 'ground-splat';
+      base.customProgramCacheKey = () => 'ground-splat'; base.userData.puddles = true;   // (rain pools on the ground)
       return base;
     }
     // the splat picture: R cobbles, G dirt, B forest floor, A sand and shore
@@ -105,9 +118,10 @@
       for (let y = 0; y < H * S; y++) for (let x = 0; x < W * S; x++) {
         const wx = (x + 0.5) / S, wz = (y + 0.5) / S, i = (y * W * S + x) * 4;
         const road = this.soft('-', wx, wz), under = this.soft('T', wx, wz), water = Math.max(this.soft('~', wx, wz), this.soft('=', wx, wz));
-        const cob = RC.smooth01((road - 0.42 + (RC.fbm(wx, wz, 0.8, 3, 33) - 0.5) * 0.3) / 0.12);
+        const town = this.town ? this.town(wx, wz) : 1, road2 = RC.smooth01((road - 0.5 + (RC.fbm(wx, wz, 0.9, 4, 33) - 0.5) * 0.75) / 0.22);   // (ragged, wandering edges)
+        const cob = road2 * RC.smooth01((town - 0.35 + (RC.fbm(wx, wz, 2, 3, 34) - 0.5) * 0.5) / 0.25), track = road2 - cob;   // (cobbles in town, a dirt track beyond)
         const kept = this.kept ? this.kept(wx, wz) : 0, worn = this.worn ? this.worn(wx, wz) : 0;
-        let dirt = RC.smooth01((RC.fbm(wx + 31, wz + 17, 3.2, 5, 5) - 0.6 + worn * 0.35 - kept * 0.12) / 0.08) * (1 - cob);
+        let dirt = Math.max(track * 0.95, RC.smooth01((RC.fbm(wx + 31, wz + 17, 3.2, 5, 5) - 0.6 + worn * 0.35 - kept * 0.12) / 0.08) * (1 - cob));
         const forest = RC.smooth01((under - 0.3) / 0.4) * (1 - cob) * 0.85, sand = RC.smooth01((water - 0.2) / 0.35) * (1 - cob);
         dirt *= 1 - forest; const sum = cob + dirt + forest + sand, k = sum > 1 ? 1 / sum : 1;
         d[i] = cob * k * 255; d[i + 1] = dirt * k * 255; d[i + 2] = forest * k * 255; d[i + 3] = sand * k * 255;

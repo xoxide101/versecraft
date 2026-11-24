@@ -49,6 +49,7 @@
         }
       }
       this.initWeather();
+      RC.weatherize(this.scene, this.shared);   // rain and snow lie on things (rc-weathering.js)
       this.cam = { x: sim.players[0].x, y: 0, z: sim.players[0].z, dist: 26.5, elev: 0.64, look: 0.35, init: false };
       this.ray = new THREE.Raycaster(); this.faded = new Set();
       // after-effects (not on low-power devices): soft shading where things meet, a glow on lights
@@ -133,6 +134,8 @@
         if (p.ring !== 'far' || (this.frameN = (this.frameN || 0) + 1) % 4 === 0) rg.update(p, t);   // detail rings: far bodies animate less often
       }
       this.cover.update(pl.x, pl.z); this.horizon.update(this.scene.fog.color, this.night);
+      if (this.coverWx !== this.cover.group.children.length) { this.coverWx = this.cover.group.children.length; RC.weatherize(this.cover.group, this.shared); }   // (new grass chunks too)
+      this.shared.uWet.value = sim.lying.wet; this.shared.uSnow.value = sim.lying.snow;
       this.shared.uRain.value = RC.damp(this.shared.uRain.value, sim.weather === 'storm' ? 1 : sim.weather === 'rain' ? 0.7 : 0, 0.5, dt);
       for (const fn of this.tickers) fn(t, { night: this.night, cam: this.cam, season: now.seasonIndex });
       if (this.bloom) { this.bloom.strength = 0.02 + this.night * 0.55; this.bloom.threshold = RC.lerp(1.6, 0.9, this.night); }   // (by day the sky must not glow)

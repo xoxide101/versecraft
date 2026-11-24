@@ -38,7 +38,8 @@
       this.dBuild = dBuild; this.dRoad = dRoad;
       this.kept = (x, z) => (1 - RC.smooth01((this.field(dBuild, x, z) - 1.5) / 4)) * RC.smooth01((RC.fbm(x + 7, z + 3, 6, 3, 61) - 0.3) / 0.2);
       this.worn = (x, z) => 1 - RC.smooth01((this.field(dRoad, x, z) - 0.3) / 1.6);
-      terrain.kept = this.kept; terrain.worn = this.worn;
+      this.town = (x, z) => 1 - RC.smooth01((this.field(dBuild, x, z) - 6) / 7);   // how much a place is 'in town' (cobbled roads) or out of it (dirt tracks)
+      terrain.kept = this.kept; terrain.worn = this.worn; terrain.town = this.town;
     }
     at(x, z) { const c = Math.floor(x), r = Math.floor(z); return r < 0 || r >= this.H || c < 0 || c >= this.W ? 'T' : this.terrain.paint[r][c]; }
     // a distance field read smoothly between cell centres
@@ -47,7 +48,7 @@
     // each cover's share at a point in the world
     masks() {
       const vn = RC.Covers.vnoise, grass = (k) => k === '.' || k === ',';   // (kept / natural: this.kept)
-      const free = (x, z) => !this.solid[Math.floor(z) * this.W + Math.floor(x)] && this.at(x, z) !== '-';
+      const free = (x, z) => !this.solid[Math.floor(z) * this.W + Math.floor(x)] && this.terrain.soft('-', x, z) < 0.42 + (RC.fbm(x, z, 0.9, 4, 33) - 0.5) * 0.75;   // grass creeps onto the road edges along the same ragged line
       const gaps = (x, z) => RC.smooth01((vn(x + 40, z + 40, 2.6, 11) - 0.22) / 0.25);   // bare earth here and there
       return {
         meadow: (x, z) => { const k = this.at(x, z); return grass(k) && free(x, z) ? (0.8 - this.terrain.soft(',', x, z) * 0.35) * gaps(x, z) * (1 - this.kept(x, z) * 0.8) : 0; },
