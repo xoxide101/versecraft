@@ -31,7 +31,7 @@
     tiny_spinifex: { name: 'Tiny spinifex (filler)', ground: '#5d7a3a', layout: 'clumps', clumps: 900, perClump: [6, 10], spread: 0.025, h: [0.05, 0.11], w: 0.004, lean: 1.2, droop: 0.04, stiff: true, root: '#3f6a2a', tip: '#a6c86a' },
     // ---- wet, dry, cold
     reed_marsh: { name: 'Reed marsh', ground: '#2f5a55', layout: 'clumps', clumps: 26, perClump: [5, 9], spread: 0.3, h: [0.9, 1.5], w: 0.02, lean: 0.12, droop: 0.05, root: '#3c5a2a', tip: '#9cbf68',
-      heads: { kind: 'cattail', chance: 0.35, color: '#5a3620' }, extra: { chance: 0.5, h: [0.5, 0.9], tip: '#b8c98a' } },
+      heads: { kind: 'cattail', chance: 0.5, color: '#5a3620' }, extra: { chance: 0.5, h: [0.5, 0.9], tip: '#b8c98a' } },
     pampas: { name: 'Pampas', ground: '#8a7560', layout: 'clumps', clumps: 4, perClump: [40, 60], spread: 0.22, h: [0.55, 0.9], w: 0.012, lean: 0.9, droop: 0.5, root: '#6f7a58', tip: '#cfd6b4', heads: { kind: 'plume', perClump: [3, 6], h: [1.3, 1.8], color: '#efe6cf' } },
     elephant_grass: { name: 'Elephant grass', ground: '#3b3a2c', layout: 'even', count: 650, h: [1.0, 1.9], w: 0.028, lean: 0.55, droop: 0.45, root: '#1f4a1a', tip: '#6dbb3c' },
     rye_cornflowers: { name: 'Rye and cornflowers', ground: '#6e5232', layout: 'even', count: 1300, h: [0.7, 0.9], w: 0.007, lean: 0.06, droop: 0.02, stiff: true, root: '#8a7a3a', tip: '#e0c46a', heads: { kind: 'ear', chance: 0.9, color: '#d9b75a' }, flowers: { chance: 0.07, colors: ['#2f55d4', '#3b6ae8', '#c8281e'], h: [0.5, 0.8] } },
@@ -102,7 +102,7 @@
     };
     const flower = (x, z) => { if (!keep(x, z)) return; const h = range(fl.h), c = C(fl.colors[Math.floor(r() * fl.colors.length)]); const tip = blade(x, z, h, 0.004, r() * 6.28, 0.05, 0, C('#4a6a2a'), C('#5a7a3a'), true, 3, 0, 0, GY(x, z));
       if (fl.big) { for (let k = 0; k < 5; k++) { const pa = k * 1.256; blob(tip[0] + Math.cos(pa) * 0.022, tip[1], tip[2] + Math.sin(pa) * 0.022, 0.018, 0.006, c, 5); } blob(tip[0], tip[1] + 0.004, tip[2], 0.01, 0.008, C('#f0a020'), 5); }
-      else blob(tip[0], tip[1], tip[2], 0.03, 0.016, c, 6); };
+      else { for (let k = 0; k < 5; k++) { const pa = k * 1.256 + x * 9; blob(tip[0] + Math.cos(pa) * 0.014, tip[1], tip[2] + Math.sin(pa) * 0.014, 0.012, 0.005, c, 5); } blob(tip[0], tip[1] + 0.004, tip[2], 0.007, 0.006, C(c[2] > 0.7 && c[0] < 0.5 ? '#f5f0d0' : '#e8a21a'), 5); } };   // small flowers: five petals round a centre
     const plume = (x, z) => { const ph = range(head.h), ang = r() * 6.28, lean = 0.08 + r() * 0.12; const tip = blade(x, z, ph, 0.006, ang, lean, 0, C('#bfb79a'), C('#d8cfb4'), true, 4, 0, 0, GY(x, z));
       for (let k = 0; k < 14; k++) blade(tip[0] - Math.cos(ang) * 0.02, tip[2] - Math.sin(ang) * 0.02, 0.32 + r() * 0.12, 0.012, ang + (r() - 0.5) * 1.4, 0.25 + r() * 0.3, 0.1, C(head.color), C('#fffaf0'), false, 3, 0, 0, tip[1] - 0.42 + k * 0.025); };
     const clumpAt = (cx, cz) => { const n = Math.round(range(R.perClump)); for (let i = 0; i < n; i++) plant(cx + (r() - 0.5) * R.spread, cz + (r() - 0.5) * R.spread); if (head && head.kind === 'plume') for (let i = 0, m = Math.round(range(head.perClump)); i < m; i++) plume(cx + (r() - 0.5) * 0.1, cz + (r() - 0.5) * 0.1); };

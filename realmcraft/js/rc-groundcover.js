@@ -65,12 +65,13 @@
     makeChunk(cx, cz, level) {   // cx, cz: chunk corner in cells
       const T = this.T, CH = this.CH, g = new T.Group(), M = this.M || (this.M = this.masks()), ox = cx + CH / 2, oz = cz + CH / 2;
       const density = level === 'near' ? this.rings.dense : this.rings.light;
+      const boost = { reed_marsh: 2.6, wildflower_meadow: 1.5 };   // (reeds and flowers stay full even where the grass is thinned for speed)
       for (const [k, mask] of Object.entries(M)) {
         if (level === 'mid' && (k === 'tiny_spinifex' || k === 'lawn')) continue;   // (far off, the fine stuff is just the ground picture)
         const local = (x, z) => mask(ox + x, oz + z);
         let any = false; for (let i = 0; i < 9 && !any; i++) if (local(((i % 3) - 1) * CH * 0.4, (Math.floor(i / 3) - 1) * CH * 0.4) > 0.02) any = true;
         if (!any) continue;
-        const ge = RC.Covers.build(T, RC.Covers.RECIPES[k], CH, CH, cx * 131 + cz * 7 + k.length, local, { density, height: (x, z) => this.terrain.groundY(ox + x, oz + z) });
+        const ge = RC.Covers.build(T, RC.Covers.RECIPES[k], CH, CH, cx * 131 + cz * 7 + k.length, local, { density: Math.min(1, density * (boost[k] || 1)), height: (x, z) => this.terrain.groundY(ox + x, oz + z) });
         if (!ge.attributes.position.count) continue;
         const m = new T.Mesh(ge, this.material(k)); m.position.set(ox, 0, oz); m.receiveShadow = true; m.castShadow = level === 'near'; m.frustumCulled = true;
         ge.computeBoundingSphere(); g.add(m);
