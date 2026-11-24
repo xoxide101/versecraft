@@ -44,15 +44,17 @@ function human(o) {
     LWrist: { from: 'LElbow', side: S(0.005), up: S(-0.25), fwd: S(0.03) },
     LHip: { from: 'Hips', side: S(0.108), up: S(0.02) },
     LKnee: { from: 'LHip', up: S(-0.47 * legK), fwd: S(0.015) },
-    LAnkle: { from: 'LKnee', up: S(-0.41 * legK), fwd: S(-0.02) },
-    LToe: { from: 'LAnkle', fwd: S(0.15), ground: 0.025 },
+    LAnkle: { from: 'LKnee', up: S(-0.43 * legK), fwd: S(-0.02) },
+    LHeel: { from: 'LAnkle', fwd: S(-0.055), ground: 0.03 },
+    LToe: { from: 'LAnkle', fwd: S(0.16), ground: 0.03 },
   };
   if (!o.dress) { delete j.Waist; delete j.Hem; }
   delete j.HairB; delete j.HairT;   // (hair is put on in the game)
-  const chains = { torso: ['Hips', 'Spine', 'Chest', 'Collar'], neck: ['Collar', 'Neck'], head: ['Neck', 'Head', 'Crown'], LArm: ['LSh', 'LElbow', 'LWrist'], LLeg: ['LHip', 'LKnee', 'LAnkle'], LFoot: ['LAnkle', 'LToe'] };
+  const chains = { torso: ['Hips', 'Spine', 'Chest', 'Collar'], neck: ['Collar', 'Neck'], head: ['Neck', 'Head', 'Crown'], LArm: ['LSh', 'LElbow', 'LWrist'], LLeg: ['LHip', 'LKnee', 'LAnkle'], LFoot: ['LHeel', 'LToe'] };
   const attach = { neck: 'Collar', head: 'Neck', LArm: 'Collar', LLeg: 'Hips', LFoot: 'LAnkle' };
   if (o.dress) { chains.skirt = ['Waist', 'Hem']; attach.skirt = 'Hips'; }
-  const top = o.dress ? 'dress' : 'shirt';
+  if (o.coat) { j.CoatW = { from: 'Hips', up: S(0.06) }; j.CoatHem = { from: 'Hips', up: S(-0.36) }; chains.coat = ['CoatW', 'CoatHem']; attach.coat = 'Hips'; }
+  const top = o.dress ? 'dress' : o.coat ? 'coat' : 'shirt';
   const hipW = f ? 0.175 : 0.16, chestW = f ? 0.155 : 0.172, shW = f ? 0.15 : 0.168;
   const vols = [
     { chain: 'torso', material: top, frame: 'up', sides: 24, caps: ['dome', 'dome'], smooth_angle: 40,
@@ -64,8 +66,10 @@ function human(o) {
     { chain: 'LLeg', material: o.dress ? 'skin' : 'trousers', sides: 12, caps: ['dome', 'none'], smooth_angle: 45,
       profile: [[0, W(0.072), W(0.08)], [0.25, W(0.068), W(0.075)], [0.5, W(0.05), W(0.052)], [0.66, W(0.055), W(0.058)], [1, S(0.038), S(0.04)]] },
     { chain: 'LFoot', material: 'boots', frame: 'ground', sides: 10, caps: ['dome', 'dome'],
-      profile: [[0, S(0.045), S(0.05)], [0.35, S(0.045), S(0.042)], [0.8, S(0.042), S(0.03)], [1, S(0.035), S(0.024)]] },
+      profile: [[0, S(0.04), S(0.045)], [0.22, S(0.047), S(0.06)], [0.5, S(0.046), S(0.04)], [0.85, S(0.044), S(0.03)], [1, S(0.036), S(0.024)]] },   // (heel, the instep high over the ankle, down to the toe: a flat shoe)
   ];
+  if (o.coat) vols.push({ chain: 'coat', material: 'coat', frame: 'up', sides: 22, caps: ['none', 'none'], smooth_angle: 40, soft: true,
+    profile: [[0, W(0.168), W(0.118)], [0.3, W(0.19), W(0.14)], [1, W(0.235), W(0.19)]] });
   if (o.dress) vols.push({ chain: 'skirt', material: 'dress', frame: 'up', sides: 20, caps: ['none', 'none'], smooth_angle: 40, soft: true,
     profile: [[0, W(0.15), W(0.11)], [0.2, W(0.2), W(0.16)], [0.6, W(0.27), W(0.24)], [1, W(0.33), W(0.3)]] });
   const parts = [
@@ -89,7 +93,7 @@ function human(o) {
   };
   const range = { Hips: { ry: [-20, 20], rz: [-10, 10] }, Spine: { rx: [-20, 30], ry: [-30, 30] }, Chest: { rx: [-20, 30], ry: [-20, 20] }, Head: { rx: [-30, 30], ry: [-70, 70] },
     LSh: { rx: [-160, 60], ry: [-40, 40], rz: [-30, 160] }, LElbow: { rx: [-150, 0] }, LHip: { rx: [-90, 40], rz: [-10, 40] }, LKnee: { rx: [0, 140] }, LAnkle: { rx: [-40, 40] } };
-  const palette = { skin: mat('#e0b090', 0.6), hair: mat('#5a3a22', 0.75), shirt: mat('#d8d0c0'), trousers: mat('#5a5048'), dress: mat('#7a8aa0'), apron: mat('#e8e0d0'), boots: mat('#4a3424', 0.7), eye: mat('#2a1e18', 0.2) };
+  const palette = { skin: mat('#e0b090', 0.6), hair: mat('#5a3a22', 0.75), shirt: mat('#d8d0c0'), coat: mat('#5a3a28'), trousers: mat('#5a5048'), dress: mat('#7a8aa0'), apron: mat('#e8e0d0'), boots: mat('#4a3424', 0.7), eye: mat('#2a1e18', 0.2) };
   // shading: the plain ramp and a little grain, not the creature stack (that pushes colour for monsters: blue shadows, hot skin)
   const shading = { stack: false, gradient: { top: 0.05, bottom: -0.12 }, noise: { size: 0.008, amount: 0.06 } };
   return { name: o.name, height: H, palette, shading, smooth_angle: 45, joints: j, chains, attach, mirror: ['LArm', 'LLeg', 'LFoot'], volumes: vols, parts, animations: anims, joint_range: range,
@@ -98,6 +102,7 @@ function human(o) {
 
 const BODIES = {
   man: { sex: 'm', height: 1.76, build: 0.45, hair: 'short' },
+  hero: { sex: 'm', height: 1.78, build: 0.55, hair: 'short', coat: true },
   man_stout: { sex: 'm', height: 1.72, build: 0.95, hair: 'short', apron: true },
   woman: { sex: 'f', height: 1.64, build: 0.35, hair: 'bun', dress: 'long', apron: true },
   woman_long: { sex: 'f', height: 1.66, build: 0.3, hair: 'long', dress: 'mid' },

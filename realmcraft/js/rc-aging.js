@@ -88,7 +88,7 @@
       sh.fragmentShader = HEAD + sh.fragmentShader.replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>' + BODY);
     };
     const key = m.customProgramCacheKey && m.customProgramCacheKey !== Object.getPrototypeOf(m).customProgramCacheKey ? m.customProgramCacheKey.bind(m) : null;
-    m.customProgramCacheKey = () => (key ? key() : m.type) + '|age';
+    m.customProgramCacheKey = () => (key ? key() : m.type + (before ? String(before) : '')) + '|age';
     m.userData.age = u; m.needsUpdate = true; return m;
   };
 
@@ -99,11 +99,11 @@
     let n = 0; const gs = parts.map((p) => { const g = (p.geo.index ? p.geo.toNonIndexed() : p.geo.clone()); g.applyMatrix4(p.mat4); n += g.attributes.position.count; return g; });
     const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3), uvs = new Float32Array(n * 2), c = new T.Color(); let o = 0;
     gs.forEach((g, i) => {
-      const P = g.attributes.position, N = g.attributes.normal, UV = g.attributes.uv; c.set(parts[i].color || '#ffffff');
+      const P = g.attributes.position, N = g.attributes.normal, UV = g.attributes.uv, CC = parts[i].color == null && g.attributes.color ? g.attributes.color : null; c.set(parts[i].color || '#ffffff');
       for (let j = 0; j < P.count; j++, o++) {
         pos[o * 3] = P.getX(j); pos[o * 3 + 1] = P.getY(j); pos[o * 3 + 2] = P.getZ(j);
         const nx = N.getX(j), ny = N.getY(j), nz = N.getZ(j); nor[o * 3] = nx; nor[o * 3 + 1] = ny; nor[o * 3 + 2] = nz;
-        col[o * 3] = c.r; col[o * 3 + 1] = c.g; col[o * 3 + 2] = c.b;
+        if (CC) { col[o * 3] = CC.getX(j); col[o * 3 + 1] = CC.getY(j); col[o * 3 + 2] = CC.getZ(j); } else { col[o * 3] = c.r; col[o * 3 + 1] = c.g; col[o * 3 + 2] = c.b; }
         if (uv) { const ax = Math.abs(nx), ay = Math.abs(ny); const a = ay > 0.6 ? P.getX(j) : ax > 0.6 ? P.getZ(j) : P.getX(j), b = ay > 0.6 ? P.getZ(j) : P.getY(j); uvs[o * 2] = a / uv; uvs[o * 2 + 1] = b / uv; }
         else if (UV) { uvs[o * 2] = UV.getX(j); uvs[o * 2 + 1] = UV.getY(j); }
       }

@@ -48,7 +48,7 @@
           sh.fragmentShader = FRAG_HEAD + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>' + FRAG_BODY(puddles))
             .replace('#include <opaque_fragment>', puddles ? '  outgoingLight = mix(outgoingLight, vec3(dot(outgoingLight, vec3(0.3, 0.5, 0.2))) * vec3(0.92, 0.96, 1.0), wxPuddle * 0.85);\n#include <opaque_fragment>' : '#include <opaque_fragment>');   // (puddles mirror a grey sky, not a blue one)
         };
-        m.customProgramCacheKey = () => (key ? key() : m.type) + '|wx' + (puddles ? 'p' : '');
+        m.customProgramCacheKey = () => (key ? key() : m.type + (before ? String(before) : '')) + '|wx' + (puddles ? 'p' : '');   // (a material's own shader changes stay part of its name: two different ones must never share a program)
         m.needsUpdate = true;
       }
     });

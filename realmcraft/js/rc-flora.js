@@ -71,16 +71,16 @@
       for (let k = 0; k < 4; k++) { const a = r() * 6.28, y0 = 0.35 + r() * 0.35; bark.push(limb(T, V3(0, y0, 0), V3(Math.sin(a) * 0.45, y0 - 0.12, Math.cos(a) * 0.45), 0.03, 0.008, 4)); }   // dead twigs low on the trunk, where the light doesn't reach
       const tiers = 7 + Math.floor(r() * 3);
       for (let i = 0; i < tiers; i++) {
-        const t = i / tiers, y = 0.55 + t * (H - 0.3), rad = (1 - t) * 1.45 + 0.25, n = Math.round((5 + (1 - t) * 8) * detail);
+        const t = i / tiers, y = 0.75 + t * (H - 0.45), rad = (1 - t) * 1.38 + 0.25, n = Math.round((5 + (1 - t) * 8) * detail);
         for (let j = 0; j < n; j++) {
-          const a = (j / n) * 6.28 + r(), p = new T.PlaneGeometry(rad * 1.25, rad * 0.9); p.rotateX(-Math.PI / 2 + 0.35 + (1 - t) * (1 - t) * 0.45); p.translate(0, 0, rad * 0.55);   // (the lowest boughs sweep down toward the ground) p.rotateY(a); p.translate(0, y, 0);
+          const a = (j / n) * 6.28 + r(), p = new T.PlaneGeometry(rad * 1.25, rad * 0.9); p.rotateX(-Math.PI / 2 + 0.35 + (1 - t) * (1 - t) * 0.2); p.translate(0, 0, rad * 0.55);   // (the lowest boughs sweep down toward the ground) p.rotateY(a); p.translate(0, y, 0);
           const pos = p.attributes.position, nor = p.attributes.normal, col = new Float32Array(pos.count * 3), k = 0.8 + r() * 0.25;
           for (let q = 0; q < pos.count; q++) { const nx = pos.getX(q), nz = pos.getZ(q), l = Math.hypot(nx, 0.7, nz); nor.setXYZ(q, nx / l, 0.7 / l, nz / l); col[q * 3] = col[q * 3 + 1] = col[q * 3 + 2] = k * (0.75 + t * 0.35); }
           p.setAttribute('color', new T.BufferAttribute(col, 3)); leaves.push(p);
           if (j % 2 === 0 && t < 0.8) bark.push(limb(T, V3(0, y - 0.1, 0), V3(Math.sin(a) * rad * 0.8, y - 0.25, Math.cos(a) * rad * 0.8), 0.035, 0.012, 4));
         }
         const cone = new T.ConeGeometry(rad * 0.82, (H - 0.6) / tiers * 2.4, 10, 2, false), cp = cone.attributes.position, cn = cone.attributes.normal, cc = new Float32Array(cp.count * 3);
-        for (let q = 0; q < cp.count; q++) { const x = cp.getX(q), z = cp.getZ(q), w = 0.85 + RC.hash(q, i, seed) * 0.3; const cap = cn.getY(q) < -0.9; cp.setXYZ(q, x * w, cp.getY(q) + y + 0.1, z * w); const l = Math.hypot(x, 0.6, z) || 1; if (cap) cn.setXYZ(q, 0, -1, 0); else cn.setXYZ(q, x / l, 0.6 / l, z / l); cc[q * 3] = cc[q * 3 + 1] = cc[q * 3 + 2] = cap ? 0.3 : 0.6 + t * 0.2; }   // (closed underneath, dark in its own shade: no hollow showing)
+        for (let q = 0; q < cp.count; q++) { const x = cp.getX(q), z = cp.getZ(q), w = 0.85 + RC.hash(q, i, seed) * 0.3; const cap = cn.getY(q) < -0.9; cp.setXYZ(q, x * w, cp.getY(q) + y + 0.1, z * w); const l = Math.hypot(x, 0.6, z) || 1; if (cap) cn.setXYZ(q, 0, -1, 0); else cn.setXYZ(q, x / l, 0.6 / l, z / l); cc[q * 3] = cc[q * 3 + 1] = cc[q * 3 + 2] = cap ? 0.42 : 0.66 + t * 0.2; }   // (closed underneath, dark in its own shade: no hollow showing)
         cone.setAttribute('color', new T.BufferAttribute(cc, 3)); fill.push(cone.index ? cone.toNonIndexed() : cone);
       }
     } else {

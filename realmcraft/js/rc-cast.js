@@ -77,7 +77,7 @@
       f.onReady = () => {
         const B = f.bones;
         if (B.RArm1Wr) B.RArm1Wr.add(prop);
-        if (opt.player && B.Chest) {   // the hero: a cloak from the shoulders, a sword on the back
+        if (false && opt.player && B.Chest) {   // (the old cloak and back sword: the hero now wears a coat, a baldric and a sword at the hip, rc-folk.js)
           const cape = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 1.0, 4, 8).translate(0, -0.5, 0), M(look.cloak || '#8a1c1c', { side: THREE.DoubleSide })); cape.position.set(0, 0.2, -0.13); cape.castShadow = true; B.Chest.add(cape); f.cape = cape;
           const sw = new THREE.Group(); sw.position.set(0.1, 0.1, -0.15); sw.rotation.z = 0.6; B.Chest.add(sw); mesh(new THREE.BoxGeometry(0.05, 0.75, 0.02), M('#cbd5e1', { metalness: 0.8, roughness: 0.25 }), 0, 0.2, 0, sw); mesh(new THREE.BoxGeometry(0.2, 0.04, 0.05), M('#b45309'), 0, -0.18, 0, sw);
         }
@@ -113,7 +113,7 @@
           if (s.talking) { add('Head', Math.sin(t * 5) * 0.05); add('RArm1Sh', -0.3 + Math.sin(t * 3) * 0.15); add('RArm1El', -0.5); }
           if (f.baby) { add('RArm1Sh', -0.6); add('LArm1Sh', -0.6); add('RArm1El', -1.1); add('LArm1El', -1.1); f.baby.rotation.z = Math.sin(t * 1.5) * 0.08; }
           if (f.cape) f.cape.rotation.x = 0.12 + s.moving * 0.35 + Math.sin(t * 2.3 + s.phase) * 0.04;
-          if (f.head) f.head.update(t);
+          if (f.head) { const near = s.ring !== 'far'; if (f.head.near !== near) { f.head.near = near; for (const d of [...(f.head.detail || []), ...(f.small || [])]) d.visible = near; } if (near) f.head.update(t); }
         },
       };
     },

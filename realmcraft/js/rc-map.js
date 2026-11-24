@@ -401,12 +401,12 @@
             const sd = Math.floor(t.x * 31 + t.z * 17), rr = RC.rng(sd + 5), geo = new THREE.IcosahedronGeometry(0.5, 2), gp = geo.attributes.position;
             for (let i = 0; i < gp.count; i++) { const x = gp.getX(i), y = gp.getY(i), z = gp.getZ(i), k = 1 + (RC.vnoise(x * 4 + sd, z * 4, 1, 90 + sd % 7) - 0.5) * 0.55 + (RC.vnoise(x * 9, y * 9 + sd, 1, 95) - 0.5) * 0.15; gp.setXYZ(i, x * k * 1.15, Math.max(-0.08, y * k * 0.85), z * k); }
             geo.computeVertexNormals();
-            const rk = new THREE.Mesh(geo, M('#757a80', { map: GRAN.map, normalMap: GRAN.normalMap, roughness: 0.95, flatShading: false })); rk.position.y = 0.04; rk.castShadow = rk.receiveShadow = true; o.add(rk);
-            const oreM = M(ORE[0], { metalness: ORE[1], roughness: ORE[2], emissive: metal === 'extensium' ? ORE[0] : '#000000', emissiveIntensity: metal === 'extensium' ? 0.9 : 0 });
+            const rkT = RC.Tex.real(THREE, 'rock_face') || GRAN, rk = new THREE.Mesh(geo, M('#c4c6c8', { map: rkT.map, normalMap: rkT.normalMap, roughness: 0.9, flatShading: false })); rk.position.y = 0.04; rk.castShadow = rk.receiveShadow = true; o.add(rk);
+            const oreM = M(ORE[0], { metalness: ORE[1], roughness: ORE[2], emissive: metal === 'extensium' ? ORE[0] : ORE[0], emissiveIntensity: metal === 'extensium' ? 0.9 : 0.12 });
             const glow = metal === 'extensium' ? oreM : null; if (glow) glowMats.add(glow);
-            for (let i = 0; i < 9; i++) { const a = rr() * 6.28, hgt = 0.12 + rr() * 0.4, rad = 0.38 + rr() * 0.1, big = i < 4, c2 = new THREE.Mesh(big ? new THREE.OctahedronGeometry(0.05 + rr() * 0.06) : new THREE.BoxGeometry(0.05, 0.03, 0.05), oreM);
+            for (let i = 0; i < 10; i++) { const a = rr() * 6.28, hgt = 0.1 + rr() * 0.38, rad = 0.36 + rr() * 0.1, big = i < 6, c2 = new THREE.Mesh(big ? new THREE.OctahedronGeometry(0.09 + rr() * 0.07) : new THREE.BoxGeometry(0.07, 0.04, 0.07), oreM);
               c2.scale.y = big ? 1.5 + rr() : 1; c2.position.set(Math.cos(a) * rad, hgt, Math.sin(a) * rad); c2.rotation.set(rr() * 3, rr() * 3, rr() * 3); c2.castShadow = true; o.add(c2); }
-            for (let i = 0; i < 3; i++) { const sm = new THREE.Mesh(new THREE.BoxGeometry(0.34 + rr() * 0.12, 0.02, 0.025), oreM); const a = rr() * 6.28; sm.position.set(Math.cos(a) * 0.3, 0.2 + rr() * 0.2, Math.sin(a) * 0.3); sm.rotation.y = -a + Math.PI / 2; sm.rotation.z = (rr() - 0.5) * 0.9; o.add(sm); }   // seams
+            for (let i = 0; i < 4; i++) { const sm = new THREE.Mesh(new THREE.BoxGeometry(0.34 + rr() * 0.14, 0.045, 0.04), oreM); const a = rr() * 6.28; sm.position.set(Math.cos(a) * 0.31, 0.18 + rr() * 0.22, Math.sin(a) * 0.31); sm.rotation.y = -a + Math.PI / 2; sm.rotation.z = (rr() - 0.5) * 0.9; o.add(sm); }   // seams
           }
           else if (n === 'timber_pile') for (let i = 0; i < 3; i++) { const l = cyl(0.12, 0.12, 0.9, M('#8b5a2b'), 8); l.rotation.z = Math.PI / 2; l.position.set(0, 0.12 + (i === 2 ? 0.22 : 0) - 0.45, (i - 1) * 0.25 * (i === 2 ? 0 : 1)); o.add(l); }
           else if (n === 'fruit_tree') {   // a real grown tree (same maker as the woods) with apples hanging in it
@@ -424,6 +424,29 @@
             const bm = M(['#6a2a7a', '#b0203a'][Math.floor(RC.hash(t.x, t.z, 3) * 2)], { roughness: 0.35 });
             for (let i = 0; i < 16; i++) { const a = RC.hash(i, 1, 71) * 6.28, rr = 0.22 + RC.hash(i, 2, 71) * 0.3, b = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), bm); b.position.set(Math.cos(a) * rr, 0.18 + RC.hash(i, 3, 71) * 0.4, Math.sin(a) * rr); o.add(b); }
             o.scale.setScalar(1.15); }
+          else if (n === 'herb_patch') {   // a tuft of real fern and herb plants with a few small flowers
+            const kinds = ['fern', 'sapling', 'fern'], fl = ['#f2c94c', '#ffffff', '#c4b5fd'];
+            kinds.forEach((kd, k) => { const fb = RC.Flora.bush(THREE, kd, Math.floor(t.x * 5 + t.z * 3) + k * 4 + 2, 1), tint = new THREE.Color(fb.color), lm = floraMats.leafMat(fb.leaf, 0.12), lf = new THREE.Mesh(fb.leaves, lm); lf.customDepthMaterial = lm.userData.depth;
+              for (const geo of [fb.leaves, fb.fill]) { if (!geo) continue; const c = geo.attributes.color; for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) * tint.r, c.getY(i) * tint.g, c.getZ(i) * tint.b); }
+              const g2 = new THREE.Group(); g2.add(lf); if (fb.fill) { const fm = new THREE.Mesh(fb.fill, floraMats.fillMat(fb.leaf)); g2.add(fm); } g2.position.set(Math.cos(k * 2.1) * 0.28, 0, Math.sin(k * 2.1) * 0.28); g2.scale.setScalar(0.55); o.add(g2); });
+            for (let i = 0; i < 9; i++) { const a = RC.hash(i, 1, 81) * 6.28, rr = 0.12 + RC.hash(i, 2, 81) * 0.4, sm = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 5), M(fl[i % 3])); sm.position.set(Math.cos(a) * rr, 0.22 + RC.hash(i, 3, 81) * 0.2, Math.sin(a) * rr); o.add(sm); } }
+          else if (n === 'mushroom_ring') {   // a fairy ring: real mushrooms in a circle
+            const kd = ['field_cap', 'honey_caps'][Math.floor(RC.hash(t.x, t.z, 4) * 2)];
+            for (let i = 0; i < 9; i++) { const a = (i / 9) * 6.28 + (RC.hash(i, 3, 82) - 0.5) * 0.3, cl = RC.Mushrooms.cluster(THREE, kd, Math.floor(t.x * 13 + t.z * 7) + i, mushMats); cl.position.set(Math.cos(a) * 0.62, 0, Math.sin(a) * 0.62); cl.rotation.y = RC.hash(i, 4, 82) * 6.28; cl.scale.setScalar(0.75 + RC.hash(i, 5, 82) * 0.35); o.add(cl); } }
+          else if (n === 'beehive_log') {   // a hollow log on its side with a hive in the end, bees going in and out
+            const oak = typeof OAK !== 'undefined' && OAK ? woodM('#7a5a3a', 1, 1) : M('#7a5a3a');
+            const lg = cyl(0.26, 0.28, 1.1, oak, 14); lg.rotation.z = Math.PI / 2; lg.position.set(0, 0.28, 0); lg.castShadow = true; o.add(lg);
+            const cut = new THREE.Mesh(new THREE.CircleGeometry(0.26, 14), M('#d8b98a')); cut.rotation.y = Math.PI / 2; cut.position.set(0.553, 0.28, 0); o.add(cut);
+            const hole = new THREE.Mesh(new THREE.CircleGeometry(0.1, 12), M('#1b120a')); hole.rotation.y = Math.PI / 2; hole.position.set(0.556, 0.3, 0); o.add(hole);
+            for (let i = 0; i < 3; i++) { const r = cyl(0.27, 0.27, 0.025, M('#4a3a2a'), 14); r.rotation.z = Math.PI / 2; r.position.set(-0.4 + i * 0.4, 0.28, 0); o.add(r); }
+            for (const sx of [-0.4, 0.4]) o.add(box(0.12, 0.1, 0.5, M('#6a4e34'), sx, 0, 0));
+            const bees = []; for (let i = 0; i < 6; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 5), M('#e0b020', { emissive: '#604000', emissiveIntensity: 0.2 })); o.add(b); bees.push(b); }
+            tickers.push((tm) => { bees.forEach((b, i) => { const ph = tm * (1.4 + i * 0.13) + i * 1.7; b.position.set(0.6 + Math.sin(ph) * 0.22, 0.38 + Math.sin(ph * 1.7 + i) * 0.14, Math.cos(ph * 1.3) * 0.22); }); }); }
+          else if (n === 'relic_scrap') {   // half-buried ancient pieces: a cracked stone slab, a bent bronze plate and a broken pillar stub with green patina
+            const slab = new THREE.Mesh(RC.roughBox(THREE, 0.7, 0.14, 0.5, 0.06, RC.rng(Math.floor(t.x * 9 + t.z))), GRANM); slab.position.set(0, 0.06, 0); slab.rotation.y = 0.5; slab.rotation.z = 0.08; slab.castShadow = true; o.add(slab);
+            const plate = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.025, 0.24), M('#6a8f72', { metalness: 0.7, roughness: 0.45 })); plate.position.set(0.18, 0.15, 0.12); plate.rotation.set(0.25, 0.8, 0.15); o.add(plate);
+            const stub = cyl(0.14, 0.17, 0.32, GRANM, 10, -0.28, 0, -0.1); stub.rotation.z = 0.35; o.add(stub);
+            const rune = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.012, 6, 18), M('#d9a93a', { metalness: 0.95, roughness: 0.25 })); rune.rotation.x = Math.PI / 2 - 0.1; rune.position.set(-0.05, 0.14, 0.02); o.add(rune); }
           else { const c = { herb_patch: '#5fbf5a', berry_bush: '#2f7d32', mushroom_ring: '#d9b38c', beehive_log: '#b7791f', relic_scrap: '#8c8f99' }[n] || '#5fbf5a'; for (let i = 0; i < 5; i++) { const s = new THREE.Mesh(n === 'mushroom_ring' ? new THREE.ConeGeometry(0.09, 0.12, 7) : new THREE.SphereGeometry(0.09, 6, 4), M(c)); const a = i * 1.26; s.position.set(Math.cos(a) * 0.25, 0.1, Math.sin(a) * 0.25); o.add(s); } }
           return o; },
         station: (t) => { const o = new THREE.Group();

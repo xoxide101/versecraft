@@ -10,7 +10,7 @@
     rings: { low: { near: 16, mid: 32 }, mid: { near: 24, mid: 48 }, high: { near: 32, mid: 64 } }[tier],
     pixelRatio: { low: 1, mid: 1.5, high: 2 }[tier], shadowMap: { low: 1024, mid: 2048, high: 2048 }[tier], grass: { low: 0.35, mid: 0.7, high: 1 }[tier],
   };
-  RC.settings = { seeThrough: 'silhouette' };   // how you show behind things: 'silhouette' (you, dimmed through them) or 'fade' (they fade)
+  RC.settings = { seeThrough: 'silhouette' }; if (/[?&]folk=0/.test(location.search)) RC.settings.folk = false;   // (?folk=0: the old figures, to compare)   // how you show behind things: 'silhouette' (you, dimmed through them) or 'fade' (they fade)
   const urlQ = new URLSearchParams(location.search).get('quality'); if (urlQ === 'low' || urlQ === 'high') RC.quality.tier = urlQ;
 
   RC.boot = (realmId) => {

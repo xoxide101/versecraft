@@ -149,6 +149,7 @@
       for (const [p, rg] of this.rigs) {
         rg.root.visible = !p.hidden;
         rg.root.position.set(p.x, sim.terrain.groundY(p.x, p.z), p.z); rg.root.rotation.y = Math.PI / 2 - p.angle;
+        p.ring = Math.hypot(p.x - this.camera.position.x, p.z - this.camera.position.z) > 24 ? 'far' : 'near';   // (far: no face details, animated less often)
         if (p.ring !== 'far' || (this.frameN = (this.frameN || 0) + 1) % 4 === 0) rg.update(p, t);   // detail rings: far bodies animate less often
       }
       this.cover.update(pl.x, pl.z); if (this.water) this.water.update(dt, t, pl.x, pl.z); this.horizon.update(this.scene.fog.color, this.night);

@@ -23,7 +23,7 @@
   };
   // a cap from the crown down to an edge: for each way round (u), the rows go from the top to where edge(n) says stop,
   // so the bottom edge is a smooth line (a hairline), not stair steps. place(n) → the point for a direction.
-  const capGrid = (T, place, stopAt, U = 72, V = 22, from = 0) => {
+  const capGrid = (T, place, stopAt, U = 48, V = 14, from = 0) => {
     const pos = [], uv = [], idx = [];
     for (let i = 0; i <= U; i++) { const u = (i / U) * Math.PI * 2, dir = (ph) => new T.Vector3(Math.sin(ph) * Math.sin(u), Math.cos(ph), Math.sin(ph) * Math.cos(u));
       let lo = 0.05, hi = Math.PI * 0.98; for (let it = 0; it < 22; it++) { const mid = (lo + hi) / 2; if (stopAt(dir(mid))) hi = mid; else lo = mid; }   // (the first angle down from the crown where the cap stops)
@@ -35,7 +35,7 @@
   RC.FolkHead = {
     // o: { skin, hair, lips, iris (colours), style: 'short'|'long'|'bun'|'bald'|'crop', beard: 0|1|2, sex, child, elder, hat: null|'straw'|'cap'|'helmet'|'coif', seed }
     build(T, o) {
-      const grp = new T.Group(), r = RC.rng(o.seed || 0.5), k = o.child ? 0.92 : 1;
+      const grp = new T.Group(), r = RC.rng(o.seed || 0.5), k = o.child ? 0.92 : 1, detail = [];
       const RX = 0.076 * k * (o.sex === 'f' ? 0.96 : 1), RY = 0.11 * k, RZ = 0.096 * k, CY = 0.012 * k;
       const skinM = new T.MeshStandardMaterial({ color: o.skin, roughness: 0.55, vertexColors: true });
       const skinFlat = new T.MeshStandardMaterial({ color: o.skin, roughness: 0.55 });
@@ -53,7 +53,7 @@
         y -= 0.008 * low * sm(-0.3, -0.9, n.z);                                     // under the jaw to the neck
         return new T.Vector3(x, y, z);
       };
-      const skull = shell(T, 56, 42, (p, n) => face(n));
+      const skull = shell(T, 36, 28, (p, n) => face(n));
       { // colour in the skin: cheeks and the ears warmer, a little shade round the eyes
         const P = skull.attributes.position, col = new Float32Array(P.count * 3);
         for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), fr = sm(0.02, 0.07, z);
@@ -120,11 +120,11 @@
         }
         if (style === 'bun') { const bn = add(new T.SphereGeometry(0.036 * k, 16, 12), hairM, 0, 0.07 * k, -0.095 * k); bn.scale.set(1, 0.85, 0.9); }
       } else {   // bald on top, a fringe of hair round the back and over the ears
-        const ring = capGrid(T, (n) => face(n).multiplyScalar(1.05), (n) => face(n).y < lineAt(n, 0.06), 72, 10, (u) => { const a = Math.abs(Math.atan2(Math.sin(u), Math.cos(u))); return a < 1.25 ? 9 : 1.15 + Math.max(0, 1.6 - a) * 0.8; });   // (a band: from below the bald crown down to the hairline, round the back)
+        const ring = capGrid(T, (n) => face(n).multiplyScalar(1.05), (n) => face(n).y < lineAt(n, 0.06), 48, 8, (u) => { const a = Math.abs(Math.atan2(Math.sin(u), Math.cos(u))); return a < 1.25 ? 9 : 1.15 + Math.max(0, 1.6 - a) * 0.8; });   // (a band: from below the bald crown down to the hairline, round the back)
         grp.add(new T.Mesh(ring, hairM));
       }
       if (o.beard) {   // a beard round the jaw and chin (1: short, 2: full), and a moustache
-        const bd = shell(T, 40, 26, (p, n) => face(n).multiplyScalar(1.03 + 0.03 * o.beard), (p, n) => n.z > -0.35 && p.y < (o.beard > 1 ? -0.025 : -0.04) * k && !(n.z > 0.5 && (p.x / (0.021 * k)) ** 2 + ((p.y + 0.053 * k) / (0.013 * k)) ** 2 < 1));
+        const bd = shell(T, 32, 22, (p, n) => face(n).multiplyScalar(1.03 + 0.03 * o.beard), (p, n) => n.z > -0.35 && p.y < (o.beard > 1 ? -0.025 : -0.04) * k && !(n.z > 0.5 && (p.x / (0.021 * k)) ** 2 + ((p.y + 0.053 * k) / (0.013 * k)) ** 2 < 1));
         grp.add(new T.Mesh(bd, hairM));
         const mz = frontZ(0, -0.042 * k), mo = new T.TubeGeometry(new T.CatmullRomCurve3([new T.Vector3(-0.02 * k, -0.05 * k, mz - 0.008), new T.Vector3(0, -0.041 * k, mz + 0.004), new T.Vector3(0.02 * k, -0.05 * k, mz - 0.008)]), 10, 0.0042 * k, 6, false);
         grp.add(new T.Mesh(mo, hairM));
@@ -134,10 +134,26 @@
       if (o.hat === 'cap') { const cm = new T.MeshStandardMaterial({ color: o.hatColor || '#4a4440', roughness: 0.9 }); const c2 = add(new T.SphereGeometry(RX * 1.12, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.42), cm, 0, 0.045 * k, -0.006); c2.scale.set(1.05, 0.9, 1.12); const pk = add(new T.CylinderGeometry(0.05 * k, 0.05 * k, 0.006, 16, 1, false, -Math.PI / 2, Math.PI), cm, 0, 0.068 * k, 0.07 * k); pk.rotation.x = 0.15; }
       if (o.hat === 'helmet') { const im = new T.MeshStandardMaterial({ color: '#8a9098', metalness: 0.75, roughness: 0.35 }); add(new T.SphereGeometry(RX * 1.18, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), im, 0, 0.03 * k, -0.004).scale.set(1, 1.05, 1.1); add(new T.TorusGeometry(RX * 1.2, 0.006, 6, 24).rotateX(Math.PI / 2), im, 0, 0.032 * k, -0.004).scale.set(1, 1, 1.12); add(new T.BoxGeometry(0.01, 0.05, 0.012), im, 0, 0.0, frontZ(0, 0) + 0.012); }
       if (o.hat === 'coif') { const cm = new T.MeshStandardMaterial({ color: '#f2ede2', roughness: 0.95, side: T.DoubleSide }); const cf = capGrid(T, (n) => face(n).multiplyScalar(1.13), (n) => face(n).y < lineAt(n, 0.075) - 0.012 * k); grp.add(new T.Mesh(cf, cm)); }
-      grp.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.userData.face = true; } });
+      // merge: every piece baked into the head's own space, one mesh per kind (the lids stay apart: they move to blink)
+      grp.updateMatrixWorld(true);
+      const inv = new T.Matrix4().copy(grp.matrixWorld).invert(), buckets = new Map(), olds = [];
+      grp.traverse((m) => { if (!m.isMesh || lids.includes(m)) return; const mt = m.material;
+        const key = mt === skinM || mt === skinFlat ? 'skin' : mt === hairM || (mt.color && mt.color.equals(new T.Color(o.hair)) && !mt.map) ? 'hair' : mt.map || mt.metalness > 0.3 || mt.side === T.DoubleSide || /hat/.test(m.userData.kind || '') ? 'own' + mt.uuid : 'face';
+        if (!buckets.has(key)) buckets.set(key, { mat: key === 'face' ? null : key === 'hair' ? hairM : key === 'skin' ? skinM : mt, parts: [] });
+        buckets.get(key).parts.push({ geo: m.geometry, mat4: new T.Matrix4().multiplyMatrices(inv, m.matrixWorld), color: key === 'face' ? mt.color.clone() : key === 'skin' ? (m.geometry.attributes.color ? null : '#ffffff') : '#ffffff' });
+        olds.push(m); });
+      for (const m of olds) m.parent.remove(m);
+      const faceM = new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.35 });
+      if (!hairM.vertexColors) { hairM.vertexColors = true; hairM.color.set('#ffffff'); }
+      for (const [key, b] of buckets) {
+        if (key === 'hair') for (const p of b.parts) p.color = new T.Color(o.hair);
+        const m = new T.Mesh(RC.mergeParts(T, b.parts), b.mat || faceM); m.castShadow = key === 'skin' || key === 'hair' || key.startsWith('own'); m.receiveShadow = key === 'skin'; m.userData.headPart = key; grp.add(m);
+        if (key === 'face') detail.push(m);
+      }
+      for (const l of lids) detail.push(l);
       // blinking: every few seconds, the lids drop and lift again
       let nextBlink = 1 + r() * 4;
-      return { group: grp, update(t) { const ph = t - nextBlink; let c = 0; if (ph > 0) { c = ph < 0.08 ? ph / 0.08 : ph < 0.16 ? 1 - (ph - 0.08) / 0.08 : 0; if (ph > 0.16) nextBlink = t + 2 + r() * 5; } for (const l of lids) l.rotation.x = -1.15 + c * 1.35; } };
+      return { group: grp, detail, update(t) { const ph = t - nextBlink; let c = 0; if (ph > 0) { c = ph < 0.08 ? ph / 0.08 : ph < 0.16 ? 1 - (ph - 0.08) / 0.08 : 0; if (ph > 0.16) nextBlink = t + 2 + r() * 5; } for (const l of lids) l.rotation.x = -1.15 + c * 1.35; } };
     },
   };
 })();
