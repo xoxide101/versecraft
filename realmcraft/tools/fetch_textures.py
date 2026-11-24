@@ -23,6 +23,10 @@ SET = {   # our name: Poly Haven id
     'rock_face': 'rock_face_03', 'rock_mossy': 'mossy_rock', 'rock_lichen': 'lichen_rock', 'bark_brown': 'bark_brown_02', 'bark_pine': 'pine_bark',
 }
 MAPS = {'map': ('Diffuse', 1024, 82), 'normal': ('nor_gl', 512, 90), 'arm': ('arm', 512, 85)}
+# paths in high detail (the gauge): 2K colour, 1K relief, AO/rough and height (for parallax)
+HD = {'path_cobble_road': 'cobblestone_floor_04', 'path_cobble_square': 'cobblestone_pavement', 'path_cobble_mossy': 'mossy_cobblestone', 'path_cobble_grassy': 'grassy_cobblestone',
+      'path_stone_way': 'stone_pathway_02', 'path_flagstone': 'stone_tiles', 'path_dirt': 'stony_dirt_path', 'path_gravel': 'gravel_road'}
+MAPS_HD = {'map': ('Diffuse', 2048, 85, '2k'), 'normal': ('nor_gl', 1024, 92, '2k'), 'arm': ('arm', 1024, 88, '2k'), 'height': ('Displacement', 1024, 92, '2k')}
 
 def get(url):
     for i in range(3):
@@ -32,17 +36,20 @@ def get(url):
             if i == 2: raise
             time.sleep(2)
 
-def main(dl):
+def main(dl, hd=False):
+    global SET, MAPS
+    if hd: SET, MAPS = HD, MAPS_HD
     here = os.path.dirname(os.path.abspath(__file__)); out = os.path.join(here, '..', 'assets', 'tex'); os.makedirs(out, exist_ok=True); os.makedirs(dl, exist_ok=True)
     credits = ['# Textures\n', 'All from [Poly Haven](https://polyhaven.com), CC0 (public domain). Shrunk for RealmCraft.\n', '| Our name | Poly Haven | Author | Size (m) |', '|---|---|---|---|']
     for name, pid in SET.items():
         info = json.loads(get('https://api.polyhaven.com/info/' + pid)); files = json.loads(get('https://api.polyhaven.com/files/' + pid))
         dims = info.get('dimensions') or [2000, 2000]; meters = [round(d / 1000, 2) for d in dims]
         packed = {'name': name, 'source': 'polyhaven:' + pid, 'meters': meters}
-        for key, (kind, px, q) in MAPS.items():
-            f = files.get(kind, {}).get('1k', {}).get('jpg')
+        for key, spec in MAPS.items():
+            kind, px, q = spec[:3]; res = spec[3] if len(spec) > 3 else '1k'
+            f = files.get(kind, {}).get(res, {}).get('jpg') or files.get(kind, {}).get(res, {}).get('png')
             if not f: continue
-            raw_path = os.path.join(dl, f'{pid}_{kind}_1k.jpg')
+            raw_path = os.path.join(dl, f'{pid}_{kind}_{res}' + os.path.splitext(f['url'])[1])
             if not os.path.exists(raw_path):
                 data = get(f['url'])
                 if hashlib.md5(data).hexdigest() != f['md5']: raise SystemExit(f'md5 mismatch: {pid} {kind}')
@@ -54,6 +61,11 @@ def main(dl):
         open(os.path.join(out, name + '.js'), 'w', encoding='utf-8', newline='\n').write(js)
         credits.append(f"| {name} | [{info.get('name', pid)}](https://polyhaven.com/a/{pid}) | {', '.join(info.get('authors', {}).keys())} | {meters[0]} x {meters[1]} |")
         print(f'{name:18} {pid:28} {os.path.getsize(os.path.join(out, name + ".js")) // 1024} KB')
-    open(os.path.join(out, 'CREDITS.md'), 'w', encoding='utf-8', newline='\n').write('\n'.join(credits) + '\n')
+    # credits: the base set, then a section for the high-detail paths (each run rewrites only its own part)
+    cp, marker = os.path.join(out, 'CREDITS.md'), '\n## High-detail paths\n'
+    prev = open(cp, encoding='utf-8').read() if os.path.exists(cp) else ''
+    base, hdpart = (prev.split(marker) + [''])[:2]
+    text = (base.rstrip('\n') + '\n' + marker + '\n'.join(credits[4:]) + '\n') if hd else ('\n'.join(credits) + '\n' + ((marker + hdpart) if hdpart else ''))
+    open(cp, 'w', encoding='utf-8', newline='\n').write(text)
 
-if __name__ == '__main__': main(sys.argv[1])
+if __name__ == '__main__': main(sys.argv[1], '--hd' in sys.argv)

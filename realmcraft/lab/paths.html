@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paths Lab</title>
+<style>
+  :root { --ink: #e8f0ff; --panel: rgba(14, 24, 52, .86); --edge: rgba(120, 160, 255, .45); --gold: #facc15; --dim: #9fb3d9; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1230; color: var(--ink); font: 13px system-ui, "Segoe UI", sans-serif; }
+  #stage { position: fixed; inset: 0; } #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .bar { position: fixed; left: 12px; top: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--panel); border: 1.5px solid var(--edge); }
+  .bar b { color: var(--gold); margin-right: 6px; } .bar button { background: #16264f; color: var(--ink); border: 1px solid var(--edge); border-radius: 6px; padding: 4px 10px; cursor: pointer; font: inherit; }
+  .bar label { display: flex; gap: 5px; align-items: center; color: var(--dim); margin-left: 6px; } .bar input[type=range] { width: 90px; }
+  .help { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); padding: 4px 12px; border-radius: 6px; background: rgba(14,24,52,.7); color: var(--dim); font-size: 12px; white-space: nowrap; }
+  .tag { position: fixed; padding: 3px 9px; border-radius: 4px; background: rgba(20,20,24,.85); font: 700 12px ui-monospace, Consolas, monospace; letter-spacing: .04em; text-transform: uppercase; transform: translate(-50%, 0); pointer-events: none; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div class="bar" id="bar"><b>PATHS LAB</b></div>
+<div class="help">drag to turn · right-drag or Shift-drag to move · wheel to zoom right down to the stones · the figure is 1.7 m for scale · switches compare each effect</div>
+<script src="../lib/realm-libs.js"></script>
+<script src="../assets/tex/path_cobble_road.js"></script><script src="../assets/tex/path_cobble_square.js"></script><script src="../assets/tex/path_cobble_mossy.js"></script><script src="../assets/tex/path_cobble_grassy.js"></script>
+<script src="../assets/tex/path_stone_way.js"></script><script src="../assets/tex/path_flagstone.js"></script><script src="../assets/tex/path_dirt.js"></script><script src="../assets/tex/path_gravel.js"></script>
+<script src="../assets/tex/cobble_road.js"></script>
+<script src="../js/rc-core.js"></script>
+<script src="../js/rc-textures.js"></script>
+<script>
+(function () {
+  const T = THREE;
+  const host = document.getElementById('stage'), rd = new T.WebGLRenderer({ antialias: true });
+  rd.setPixelRatio(Math.min(devicePixelRatio, 2)); rd.shadowMap.enabled = true; rd.shadowMap.type = T.PCFSoftShadowMap; rd.toneMapping = T.ACESFilmicToneMapping; rd.outputColorSpace = T.SRGBColorSpace; host.append(rd.domElement);
+  const scene = new T.Scene(), cam = new T.PerspectiveCamera(35, 1, 0.02, 400);
+  const sky = new T.Sky(); sky.scale.setScalar(300); scene.add(sky); const su = sky.material.uniforms; su.turbidity.value = 5; su.rayleigh.value = 1.6; su.mieCoefficient.value = 0.004; su.mieDirectionalG.value = 0.82;
+  const hemi = new T.HemisphereLight('#dbeafe', '#4d7c3a', 0.7), sun = new T.DirectionalLight('#fff1dc', 2.6); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 80 }); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.02; scene.add(hemi, sun, sun.target);
+  const set = { parallax: true, ao: true, rough: true, normal: true, depth: 1 };
+  // a material with everything the texture offers: colour, relief, ambient occlusion, roughness and height (parallax: the stones rise, the gaps sink)
+  // one world unit = 1 m here; `m` is the texture's real size in metres
+  const L = new T.TextureLoader(), mk = (url, srgb, rep) => { const t = L.load(url); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(rep, rep); t.anisotropy = 16; if (srgb) t.colorSpace = T.SRGBColorSpace; return t; };
+  const mats = [];
+  function pathMat(name, size) {
+    const d = window.RC_TEX[name], m = d.meters[0], rep = size / m;
+    const mat = new T.MeshStandardMaterial({ map: mk(d.map, true, rep), normalMap: d.normal ? mk(d.normal, false, rep) : null, aoMap: d.arm ? mk(d.arm, false, rep) : null, roughnessMap: d.arm ? mk(d.arm, false, rep) : null, aoMapIntensity: 1, roughness: 1 });
+    const hm = d.height ? mk(d.height, false, rep) : null;
+    mat.userData = { name, d, rep, hm, normal: mat.normalMap, ao: mat.aoMap, rough: mat.roughnessMap };
+    if (hm) mat.onBeforeCompile = (sh) => {
+      sh.uniforms.tHeight = { value: hm }; sh.uniforms.uDepth = { value: 0.035 / m * rep }; sh.uniforms.uOn = { value: 1 }; mat.userData.sh = sh;
+      sh.vertexShader = 'varying vec3 vPw;\n' + sh.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n vPw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      sh.fragmentShader = 'uniform sampler2D tHeight; uniform float uDepth; uniform float uOn; varying vec3 vPw;\n' + sh.fragmentShader
+        .replace('void main() {', `void main() {
+          // steep parallax on a flat ground: march into the height map along the view ray (u runs east, v runs north)
+          vec2 pD = vec2(0.0);
+          if (uOn > 0.5) {
+            vec3 V = normalize(cameraPosition - vPw); vec2 dir = vec2(V.x, -V.z) / max(V.y, 0.25) * uDepth;
+            // more steps when looking along the ground (where the steps would show), then halve the last step five times (no banding)
+            float n = mix(48.0, 12.0, clamp(V.y, 0.0, 1.0)), dl = 1.0 / n, cur = 0.0; vec2 p = vMapUv, duv = dir * dl; float h = 1.0 - texture2D(tHeight, p).r;
+            for (int i = 0; i < 48; i++) { if (float(i) >= n || cur >= h) break; p -= duv; h = 1.0 - texture2D(tHeight, p).r; cur += dl; }
+            vec2 s = duv; float sd = dl;
+            for (int k = 0; k < 5; k++) { s *= 0.5; sd *= 0.5; if (cur >= h) { p += s; cur -= sd; } else { p -= s; cur += sd; } h = 1.0 - texture2D(tHeight, p).r; }
+            pD = p - vMapUv;
+          }`)
+        .replace('#include <map_fragment>', '#ifdef USE_MAP\n diffuseColor *= texture2D(map, vMapUv + pD);\n#endif')
+        .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = roughness;\n#ifdef USE_ROUGHNESSMAP\n roughnessFactor *= texture2D(roughnessMap, vRoughnessMapUv + pD).g;\n#endif')
+        .replace('#include <normal_fragment_maps>', '#ifdef USE_NORMALMAP_TANGENTSPACE\n vec3 mapN = texture2D(normalMap, vNormalMapUv + pD).xyz * 2.0 - 1.0; mapN.xy *= normalScale; normal = normalize(tbn * mapN);\n#endif')
+        .replace('#include <aomap_fragment>', '#ifdef USE_AOMAP\n float ambientOcclusion = (texture2D(aoMap, vAoMapUv + pD).r - 1.0) * aoMapIntensity + 1.0; reflectedLight.indirectDiffuse *= ambientOcclusion;\n #if defined( USE_CLEARCOAT ) \n clearcoatSpecularIndirect *= ambientOcclusion;\n #endif\n #if defined( USE_SHEEN ) \n sheenSpecularIndirect *= ambientOcclusion;\n #endif\n #if defined( USE_ENVMAP ) && defined( STANDARD )\n float dotNV = saturate( dot( geometryNormal, geometryViewDir ) ); reflectedLight.indirectSpecular *= computeSpecularOcclusion( dotNV, ambientOcclusion, material.roughness );\n #endif\n#endif');
+    };
+    mat.customProgramCacheKey = () => 'path-px' + name;
+    mats.push(mat); return mat;
+  }
+  // the ground around: a plain soft grass so the paths are what you look at
+  const g0 = new T.Mesh(new T.PlaneGeometry(60, 60).rotateX(-Math.PI / 2), new T.MeshStandardMaterial({ color: '#4d7a32', roughness: 1 })); g0.position.y = -0.002; g0.receiveShadow = true; scene.add(g0);
+  const ITEMS = [['path_cobble_road', 'road cobbles'], ['path_cobble_square', 'square cobbles'], ['path_cobble_mossy', 'mossy cobbles'], ['path_cobble_grassy', 'grassy cobbles'],
+    ['path_stone_way', 'stone pathway'], ['path_flagstone', 'flagstones'], ['path_dirt', 'stony dirt path'], ['path_gravel', 'gravel'], ['cobble_road', 'road cobbles (town, 1K)']];
+  const S = 3.2, tags = [], spots = [];
+  ITEMS.forEach(([name, label], i) => {
+    if (!window.RC_TEX[name]) return;
+    const col = i % 5, row = Math.floor(i / 5), x = (col - 2) * (S + 0.8), z = row * (S + 1.6) - 2;
+    const mesh = new T.Mesh(new T.PlaneGeometry(S, S).rotateX(-Math.PI / 2), pathMat(name, S)); mesh.position.set(x, 0, z); mesh.receiveShadow = true; scene.add(mesh);
+    spots.push({ name, label, x, z });
+    const tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = label; document.body.append(tag); tags.push(tag);
+  });
+  // a 1.7 m figure for scale, and a stone kerb and a bucket to judge against
+  const fig = new T.Group(), fm = new T.MeshStandardMaterial({ color: '#8a96b0', roughness: 0.8 });
+  const part = (ge, y) => { const m = new T.Mesh(ge, fm); m.position.y = y; m.castShadow = true; fig.add(m); };
+  part(new T.CapsuleGeometry(0.14, 0.62, 4, 10), 0.45); part(new T.CapsuleGeometry(0.2, 0.42, 4, 10), 1.1); part(new T.SphereGeometry(0.12, 14, 10), 1.58);
+  fig.position.set(0.6, 0, 0.2); scene.add(fig);
+  const bucket = new T.Mesh(new T.CylinderGeometry(0.15, 0.12, 0.28, 16), new T.MeshStandardMaterial({ color: '#8a5a34', roughness: 0.8 })); bucket.position.set(-0.9, 0.14, 0.3); bucket.castShadow = true; scene.add(bucket);
+  // controls
+  const view = { yaw: 0.5, pitch: 0.55, dist: 9, target: new T.Vector3(0, 0.2, 0) };
+  let drag = null; const cv = rd.domElement;
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+  cv.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, pan: e.button === 2 || e.shiftKey }; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', (e) => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+    if (drag.pan) { const k = view.dist * 0.0016; view.target.x -= (Math.cos(view.yaw) * dx + Math.sin(view.yaw) * dy) * k; view.target.z += (Math.sin(view.yaw) * dx - Math.cos(view.yaw) * dy) * k; }
+    else { view.yaw -= dx * 0.008; view.pitch = RC.clamp(view.pitch + dy * 0.006, 0.04, 1.5); } });
+  cv.addEventListener('pointerup', () => { drag = null; });
+  cv.addEventListener('wheel', (e) => { view.dist = RC.clamp(view.dist * (1 + Math.sign(e.deltaY) * 0.12), 0.3, 60); e.preventDefault(); }, { passive: false });
+  const bar = document.getElementById('bar');
+  const goTo = (s) => { view.target.set(s.x, 0.05, s.z); view.dist = 2.4; view.pitch = 0.42; };
+  for (const s of spots) { const b = document.createElement('button'); b.textContent = s.label; b.onclick = () => goTo(s); bar.append(b); }
+  const toggle = (label, key) => { const l = document.createElement('label'), i = document.createElement('input'); i.type = 'checkbox'; i.checked = set[key]; i.onchange = () => { set[key] = i.checked; apply(); }; l.append(i, label); bar.append(l); };
+  toggle('depth (parallax)', 'parallax'); toggle('shading in gaps (AO)', 'ao'); toggle('relief', 'normal'); toggle('wet/dry (roughness)', 'rough');
+  const slider = (label, min, max, val, fn) => { const l = document.createElement('label'), i = document.createElement('input'); i.type = 'range'; i.min = min; i.max = max; i.step = 'any'; i.value = val; i.oninput = () => fn(+i.value); l.append(label, i); bar.append(l); };
+  let hour = 15; slider('depth', 0, 3, 1, (v) => { set.depth = v; apply(); }); slider('sun', 6, 19, hour, (v) => { hour = v; });
+  function apply() { for (const m of mats) { const u = m.userData; m.normalMap = set.normal ? u.normal : null; m.aoMap = set.ao ? u.ao : null; m.roughnessMap = set.rough ? u.rough : null; m.roughness = set.rough ? 1 : 0.85; m.needsUpdate = true;
+    if (u.sh) { u.sh.uniforms.uOn.value = set.parallax ? 1 : 0; u.sh.uniforms.uDepth.value = 0.035 / u.d.meters[0] * u.rep * set.depth; } } }
+  const resize = () => { const w = innerWidth, h = innerHeight; rd.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); }; resize(); addEventListener('resize', resize);
+  (function frame() {
+    const a = ((hour - 6) / 13) * Math.PI, sy = Math.sin(a); su.sunPosition.value.set(Math.cos(a) * 100, sy * 100, 40); sun.position.set(view.target.x + Math.cos(a) * 20, Math.max(2, sy * 22), view.target.z + 10); sun.target.position.copy(view.target); sun.intensity = 0.5 + Math.max(0, sy) * 2.4; sun.color.set(sy < 0.35 ? '#ffc48a' : '#fff1dc');
+    const h = view.dist * Math.cos(view.pitch); cam.position.set(view.target.x + Math.sin(view.yaw) * h, view.target.y + view.dist * Math.sin(view.pitch), view.target.z + Math.cos(view.yaw) * h); cam.lookAt(view.target);
+    spots.forEach((s, i) => { const v = new T.Vector3(s.x, 0, s.z + S / 2 + 0.25).project(cam), on = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && view.dist > 3.5; tags[i].style.display = on ? '' : 'none'; tags[i].style.left = (v.x + 1) / 2 * innerWidth + 'px'; tags[i].style.top = (1 - v.y) / 2 * innerHeight + 'px'; });
+    rd.render(scene, cam); requestAnimationFrame(frame);
+  })();
+  window.LAB = { view, goTo, spots, set, apply };
+})();
+</script>
+</body>
+</html>

@@ -38,7 +38,7 @@
       this.dBuild = dBuild; this.dRoad = dRoad;
       this.kept = (x, z) => (1 - RC.smooth01((this.field(dBuild, x, z) - 1.5) / 4)) * RC.smooth01((RC.fbm(x + 7, z + 3, 6, 3, 61) - 0.3) / 0.2);
       this.worn = (x, z) => 1 - RC.smooth01((this.field(dRoad, x, z) - 0.3) / 1.6);
-      this.town = (x, z) => 1 - RC.smooth01((this.field(dBuild, x, z) - 6) / 7);   // how much a place is 'in town' (cobbled roads) or out of it (dirt tracks)
+      this.town = (x, z) => 1 - RC.smooth01((this.field(dBuild, x, z) - 16) / 10);   // how much a place is 'in town' (cobbled roads) or out of it (dirt tracks)
       terrain.kept = this.kept; terrain.worn = this.worn; terrain.town = this.town;
     }
     at(x, z) { const c = Math.floor(x), r = Math.floor(z); return r < 0 || r >= this.H || c < 0 || c >= this.W ? 'T' : this.terrain.paint[r][c]; }

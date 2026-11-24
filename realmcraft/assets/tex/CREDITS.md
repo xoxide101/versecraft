@@ -30,3 +30,13 @@ All from [Poly Haven](https://polyhaven.com), CC0 (public domain). Shrunk for Re
 | rock_lichen | [Lichen Rock](https://polyhaven.com/a/lichen_rock) | Rico Cilliers | 2.0 x 2.0 |
 | bark_brown | [Bark Brown 02](https://polyhaven.com/a/bark_brown_02) | Rob Tuytel | 1.0 x 1.0 |
 | bark_pine | [Pine Bark](https://polyhaven.com/a/pine_bark) | Dimitrios Savva | 2.0 x 2.0 |
+
+## High-detail paths
+| path_cobble_road | [Cobblestone Floor 04](https://polyhaven.com/a/cobblestone_floor_04) | Rob Tuytel | 1.5 x 1.5 |
+| path_cobble_square | [Cobblestone Pavement](https://polyhaven.com/a/cobblestone_pavement) | Charlotte Baglioni | 2.5 x 2.5 |
+| path_cobble_mossy | [Mossy Cobblestone](https://polyhaven.com/a/mossy_cobblestone) | Sơn Nguyễn | 2.0 x 2.0 |
+| path_cobble_grassy | [Grassy Cobblestone](https://polyhaven.com/a/grassy_cobblestone) | Dario Barresi, Charlotte Baglioni | 2.0 x 2.0 |
+| path_stone_way | [Stone Pathway 02](https://polyhaven.com/a/stone_pathway_02) | Amal Kumar | 1.95 x 1.95 |
+| path_flagstone | [Stone Tiles](https://polyhaven.com/a/stone_tiles) | Christopher Melani | 3.17 x 3.17 |
+| path_dirt | [Stony Dirt Path](https://polyhaven.com/a/stony_dirt_path) | eye-candy.xyz | 2.17 x 2.17 |
+| path_gravel | [Gravel Road](https://polyhaven.com/a/gravel_road) | Amal Kumar | 2.0 x 2.0 |

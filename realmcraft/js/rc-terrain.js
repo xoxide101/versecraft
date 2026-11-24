@@ -70,15 +70,18 @@
     // A small "splat" picture says how much of each layer is where; its edges are ragged fractal, never cell squares.
     groundMaterial(THREE) {
       const base = new THREE.MeshStandardMaterial({ map: this.groundTex, normalMap: this.groundNormal, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.93 });
-      const L = ['cobble_road', 'dirt_path', 'forest_ground', 'sand'].map((n) => RC.Tex.real(THREE, n));
+      const L = [RC.Tex.real(THREE, 'path_cobble_road') ? 'path_cobble_road' : 'cobble_road', 'dirt_path', 'forest_ground', 'sand'].map((n) => RC.Tex.real(THREE, n));
+      const hd = (window.RC_TEX || {}).path_cobble_road, hL = new THREE.TextureLoader(), lin = (u) => { const t2 = hL.load(u); t2.wrapS = t2.wrapT = THREE.RepeatWrapping; t2.anisotropy = 8; return t2; };
+      const cobH = hd && hd.height ? lin(hd.height) : null, cobAO = hd && hd.arm ? lin(hd.arm) : null;
       if (L.some((x) => !x)) return base;   // (textures not packed: the painted ground alone)
       const splat = this.splatTexture(THREE), U = 1.1;   // (one world unit is about 1.1 m)
       base.onBeforeCompile = (sh) => {
         sh.uniforms.tSplat = { value: splat }; sh.uniforms.uSize = { value: new THREE.Vector2(this.w, this.h) };
         L.forEach((x, i) => { sh.uniforms['tC' + i] = { value: x.map }; sh.uniforms['tN' + i] = { value: x.normalMap }; });
         sh.uniforms.uScale = { value: new THREE.Vector4(...L.map((x) => U / x.meters[0])) };
+        sh.uniforms.tCobH = { value: cobH || L[0].map }; sh.uniforms.tCobAO = { value: cobAO || L[0].map }; sh.uniforms.uCobHD = { value: cobH ? 1 : 0 }; sh.uniforms.uCobDepth = { value: (0.035 / U) * (U / L[0].meters[0]) };
         sh.vertexShader = 'varying vec3 vWp;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWp = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-        sh.fragmentShader = 'varying vec3 vWp; uniform sampler2D tSplat, tC0, tC1, tC2, tC3, tN0, tN1, tN2, tN3; uniform vec2 uSize; uniform vec4 uScale;\n' +
+        sh.fragmentShader = 'varying vec3 vWp; uniform sampler2D tSplat, tC0, tC1, tC2, tC3, tN0, tN1, tN2, tN3, tCobH, tCobAO; uniform vec2 uSize; uniform vec4 uScale; uniform float uCobHD, uCobDepth;\n' +
           'float gH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
           'float gN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(gH(i), gH(i + vec2(1, 0)), f.x), mix(gH(i + vec2(0, 1)), gH(i + vec2(1, 1)), f.x), f.y); }\n' +
           'vec2 luv(float s) { return vec2(vWp.x, -vWp.z) * s; }\n' +
@@ -87,11 +90,22 @@
               vec4 sp = texture2D(tSplat, vWp.xz / uSize);
               vec3 grassC = texture2D(map, vMapUv).rgb;
               // cobbles that don't repeat: a second, turned copy blended in by noise; each patch of stones its own tone
-              vec2 u0 = luv(uScale.x), u1 = vec2(u0.y, -u0.x) * 0.83 + 0.37;
+              vec2 u0 = luv(uScale.x), gx0 = dFdx(u0), gy0 = dFdy(u0);   // (the true detail level, taken before any branching)
+              // real depth on the cobbles (as in the paths lab): march into the height map along the view ray, then refine
+              float cobAO = 1.0;
+              if (uCobHD > 0.5 && sp.r > 0.02) {
+                vec3 V = normalize(cameraPosition - vWp); vec2 dir = vec2(V.x, -V.z) / max(V.y, 0.25) * uCobDepth;
+                float n = mix(40.0, 10.0, clamp(V.y, 0.0, 1.0)), dl = 1.0 / n, cur = 0.0; vec2 p = u0, duv = dir * dl; float h = 1.0 - textureGrad(tCobH, p, gx0, gy0).r;
+                for (int i = 0; i < 40; i++) { if (float(i) >= n || cur >= h) break; p -= duv; h = 1.0 - textureGrad(tCobH, p, gx0, gy0).r; cur += dl; }
+                vec2 s2 = duv; float sd = dl;
+                for (int k = 0; k < 4; k++) { s2 *= 0.5; sd *= 0.5; if (cur >= h) { p += s2; cur -= sd; } else { p -= s2; cur += sd; } h = 1.0 - textureGrad(tCobH, p, gx0, gy0).r; }
+                u0 = p; cobAO = mix(1.0, textureGrad(tCobAO, u0, gx0, gy0).r, 0.85);
+              }
+              vec2 u1 = vec2(u0.y, -u0.x) * 0.83 + 0.37;
               float mixA = smoothstep(0.35, 0.65, gN(vWp.xz * 0.18));
-              vec3 cob = mix(texture2D(tC0, u0).rgb, texture2D(tC0, u1).rgb, mixA);
+              vec3 cob = mix(textureGrad(tC0, u0, gx0, gy0).rgb, textureGrad(tC0, u1, vec2(gx0.y, -gx0.x) * 0.83, vec2(gy0.y, -gy0.x) * 0.83).rgb, mixA);
               float stoneH = dot(cob, vec3(0.33));
-              cob *= 0.82 + 0.34 * gN(vWp.xz * 0.55 + 5.0);
+              cob *= (0.82 + 0.34 * gN(vWp.xz * 0.55 + 5.0)) * cobAO;   // (and the gaps shaded by the texture's own occlusion)
               // moss creeping over some stones, grass growing up through the gaps near the edges and here and there
               cob = mix(cob, cob * vec3(0.72, 0.9, 0.55), smoothstep(0.6, 0.85, gN(vWp.xz * 0.33 + 9.0)) * 0.6);
               float edge = 1.0 - smoothstep(0.5, 0.95, sp.r), wild = gN(vWp.xz * 0.9 + 3.0);
@@ -104,7 +118,7 @@
               diffuseColor.rgb *= col;`)
             .replace('#include <normal_fragment_maps>', `
               #ifdef USE_NORMALMAP_TANGENTSPACE
-              vec3 mapN = (texture2D(normalMap, vNormalMapUv).xyz * 2.0 - 1.0) * wg + mix(texture2D(tN0, u0).xyz * 2.0 - 1.0, vec3(texture2D(tN0, u1).yx * vec2(1.0, -1.0) * 2.0 - vec2(1.0, -1.0), texture2D(tN0, u1).z * 2.0 - 1.0), mixA) * sp.r * 1.4 * (1.0 - grassIn * 0.7) + (texture2D(tN1, luv(uScale.y)).xyz * 2.0 - 1.0) * sp.g + (texture2D(tN2, luv(uScale.z)).xyz * 2.0 - 1.0) * sp.b + (texture2D(tN3, luv(uScale.w)).xyz * 2.0 - 1.0) * sp.a;
+              vec3 mapN = (texture2D(normalMap, vNormalMapUv).xyz * 2.0 - 1.0) * wg + mix(textureGrad(tN0, u0, gx0, gy0).xyz * 2.0 - 1.0, vec3(textureGrad(tN0, u1, vec2(gx0.y, -gx0.x) * 0.83, vec2(gy0.y, -gy0.x) * 0.83).yx * vec2(1.0, -1.0) * 2.0 - vec2(1.0, -1.0), textureGrad(tN0, u1, vec2(gx0.y, -gx0.x) * 0.83, vec2(gy0.y, -gy0.x) * 0.83).z * 2.0 - 1.0), mixA) * sp.r * 1.4 * (1.0 - grassIn * 0.7) + (texture2D(tN1, luv(uScale.y)).xyz * 2.0 - 1.0) * sp.g + (texture2D(tN2, luv(uScale.z)).xyz * 2.0 - 1.0) * sp.b + (texture2D(tN3, luv(uScale.w)).xyz * 2.0 - 1.0) * sp.a;
               mapN.z = max(mapN.z, 0.2); mapN.xy *= normalScale;
               normal = normalize(tbn * mapN);
               #endif`);
