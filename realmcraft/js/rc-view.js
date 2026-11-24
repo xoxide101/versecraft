@@ -34,20 +34,23 @@
       this.scene.add(sim.terrain.build(THREE));
       { const wm = this.scene.getObjectByName('water'); if (wm) wm.material = RC.Water.material(THREE, sim.terrain, this.shared, realm); this.water = RC.Water.life(THREE, realm, sim.terrain, this.shared); this.scene.add(this.water.group); }   // (rc-water.js)
       const map = RC.MapCraft.build(THREE, realm, sim.terrain, this.shared);
+      if (sim.terrain.stream) this.scene.add(sim.terrain.stream.build(THREE, this.shared));   // the brook, its stone channel and bridges (rc-stream.js)
       this.scene.add(map.group); this.labels = map.labels; this.tickers = map.tickers; this.buildings = map.buildings;
       this.scene.add(this.cover.group);   // grasses, reeds, wildflowers (rc-groundcover.js)
       this.horizon = new RC.Horizon(THREE, realm, sim.terrain); this.scene.add(this.horizon.group);   // forest, hills, mountains, the tower, the sea (rc-horizon.js)
       // the cast
       this.rigs = new Map();
       for (const p of [...sim.people, ...sim.players]) {
-        const rg = RC.Cast.rig(THREE, p.def.look || {}, p.def.age || 'adult', { job: p.def.job, player: !!p.isPlayer, carries: p.def.carries });
-        this.scene.add(rg.root); this.rigs.set(p, rg);
-        if (p.isPlayer) {   // seen through whatever hides you: a dim glowing outline of your figure, drawn only where something is in front
+        // seen through whatever hides you: a dim glowing outline of your figure, drawn only where something is in front
+        const outline = (root) => {
           const xm = new THREE.MeshBasicMaterial({ color: '#9fd4ff', transparent: true, opacity: 0.42, depthFunc: THREE.GreaterDepth, depthWrite: false, fog: false });
-          const meshes = []; rg.root.traverse((o) => { if (o.isMesh) meshes.push(o); });
-          for (const o of meshes) { const s = new THREE.Mesh(o.geometry, xm); s.renderOrder = 998; s.castShadow = false; o.add(s); }
-          for (const o of meshes) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 1; o.material.depthWrite = true; o.renderOrder = 999; }   // (your figure is drawn after the outline)
-        }
+          const meshes = []; root.traverse((o) => { if (o.isMesh && !o.userData.outline) meshes.push(o); });
+          for (const o of meshes) { let s; if (o.isSkinnedMesh) { s = new THREE.SkinnedMesh(o.geometry, xm); s.bind(o.skeleton, o.bindMatrix); s.position.copy(o.position); s.quaternion.copy(o.quaternion); s.scale.copy(o.scale); o.parent.add(s); } else { s = new THREE.Mesh(o.geometry, xm); o.add(s); } s.userData.outline = true; s.renderOrder = 998; s.castShadow = false; s.frustumCulled = false; }
+          for (const o of meshes) { const mm = (m) => { const c = m.clone(); c.transparent = true; c.opacity = 1; c.depthWrite = true; return c; }; o.material = Array.isArray(o.material) ? o.material.map(mm) : mm(o.material); o.renderOrder = 999; }   // (your figure is drawn after the outline)
+        };
+        const rg = RC.Cast.rig(THREE, p.def.look || {}, p.def.age || 'adult', { job: p.def.job, player: !!p.isPlayer, carries: p.def.carries, def: p.def, onReady: p.isPlayer ? (f) => outline(f.root) : null });
+        this.scene.add(rg.root); this.rigs.set(p, rg);
+        if (p.isPlayer && !rg.folk) outline(rg.root);
       }
       this.initWeather();
       // real photographed skies light the scene and show in reflections; one per mood (day, sunset, dusk, overcast, night)

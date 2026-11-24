@@ -49,7 +49,7 @@
         if (I.hit('Escape')) this.endTalk();
         pl.moving = RC.damp(pl.moving, 0, 10, dt);
       } else this.stepPlayer(dt, pl);
-      const now = this.calendar.now(), ctx = { time: now, weather: this.weather, player: pl, doors: this.doors, talkingTo: this.dialogue && this.dialogue.who && this.dialogue.who.def ? this.dialogue.who : null };
+      const now = this.calendar.now(), ctx = { time: now, weather: this.weather, player: pl, doors: this.doors, circles: this.plan.circles, talkingTo: this.dialogue && this.dialogue.who && this.dialogue.who.def ? this.dialogue.who : null };
       // detail rings: near people every step, further ones less often (with the time they missed)
       this.tick = (this.tick || 0) + 1; const R = RC.quality.rings;
       for (const p of this.people) {
@@ -80,6 +80,7 @@
       const R = 0.28, W = this.realm.w, b = this.plan.blocked;
       for (const [dx, dz] of [[-R, -R], [R, -R], [-R, R], [R, R]]) { const c = Math.floor(x + dx), r = Math.floor(z + dz); if (c < 0 || r < 0 || c >= W || r >= this.realm.h || b[r * W + c]) return false; }
       for (const k of this.plan.circles) if (Math.hypot(k.x - x, k.z - z) < k.r + R) return false;
+      if (this.terrain.stream && this.terrain.stream.blocks(x, z, R)) return false;   // the brook: no wading, cross by the bridges
       return true;
     }
     nearest(pl) {

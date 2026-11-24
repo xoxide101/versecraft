@@ -12,6 +12,7 @@
       this.sea = this.shape.find((s) => s.op === 'sea') || { floor: -0.6 };
       this.waterY = -0.05; this.pierY = 0.16;
       this.kept = null; this.worn = null;   // set by the realm (rc-groundcover.js): how tended the ground is, how worn
+      this.stream = def.stream && RC.Stream ? RC.Stream.compile(def.stream, this) : null;   // a brook through the town (rc-stream.js)
     }
     cell(x, z) { const c = Math.floor(x), r = Math.floor(z); if (r < 0 || r >= this.h || c < 0 || c >= this.w) return 'T'; return this.paint[r][c]; }
     isWater(x, z) { return WATERISH.has(this.cell(x, z)); }
@@ -23,16 +24,22 @@
       return RC.lerp(RC.lerp(g(c, r), g(c + 1, r), fx), RC.lerp(g(c, r + 1), g(c + 1, r + 1), fx), fz);
     }
     // the land's own height (no water): the shaping steps
-    land(x, z) {
+    shapeY(x, z) {
       let y = 0;
       for (const s of this.shape) {
         if (s.op === 'terrace') y += RC.smooth01((s.z - z) / Math.max(s.soft, s.rise * 11)) * s.rise;   // higher on the north side of the line; the climb is spread over a long gentle slope (at least ~11 cells per metre of rise)
         else if (s.op === 'slope') y += RC.smooth01((s.z0 - z) / (s.z0 - s.z1)) * s.rise;
         else if (s.op === 'roll') y += Math.max(0, Math.sin(x * s.fx) * Math.cos(z * s.fz)) * s.amp;
       }
+      return y;
+    }
+    landRaw(x, z) {
+      let y = this.shapeY(x, z);
       if (this.cell(x, z) === '-') y += 0.04;   // roads sit a touch proud
       const r = this.rough(x, z); return r >= 0 || this.waterY == null ? y + r : Math.max(y + r, Math.min(y, this.waterY + 0.05));   // (hollows never dip below the sea's level: the water would show through)
     }
+    // the land with the stream's channel cut into it
+    land(x, z) { const y = this.landRaw(x, z); return this.stream ? this.stream.cut(x, z, y) : y; }
     // small rises and hollows everywhere (nothing is laid perfectly level): a few cm on roads, more on grass, most in the woods
     rough(x, z) {
       const AMP = { '-': 0.035, '.': 0.07, ',': 0.11, 'T': 0.16, '=': 0, '~': 0.05 }, X = RC.clamp(x - 0.5, 0, this.w - 1.001), Z = RC.clamp(z - 0.5, 0, this.h - 1.001), c = Math.floor(X), r = Math.floor(Z), fx = RC.smooth01(X - c), fz = RC.smooth01(Z - r);
@@ -52,6 +59,7 @@
     // where feet go
     groundY(x, z) {
       for (const d of this.decks || []) if (x >= d.x0 && x <= d.x1 && z >= d.z0 && z <= d.z1) return d.heightAt(z);   // on a pier (and its ramp)
+      if (this.stream) for (const d of this.stream.decks) if (x >= d.x0 && x <= d.x1 && z >= d.z0 && z <= d.z1) return d.heightAt(z, x);   // on a bridge
       const c = this.cell(x, z); return c === '=' ? this.pierY : c === '~' ? this.waterY : this.land(x, z);
     }
 
@@ -148,7 +156,7 @@
         const kept = this.kept ? this.kept(wx, wz) : 0, worn = this.worn ? this.worn(wx, wz) : 0;
         let dirt = Math.max(track * 0.95, RC.smooth01((RC.fbm(wx + 31, wz + 17, 3.2, 5, 5) - 0.6 + worn * 0.35 - kept * 0.12) / 0.08) * (1 - cob));
         const wildG = this.cell(wx, wz) === ',' || this.cell(wx, wz) === '.' ? 1 - kept : 0, bare = RC.smooth01((RC.fbm(wx + 70, wz + 20, 3.5, 4, 55) - 0.66) / 0.07) * wildG * 0.75;
-        const forest = RC.smooth01((under - 0.3) / 0.4) * (1 - cob) * 0.85, sand = Math.max(RC.smooth01((water - 0.2) / 0.35), bare) * (1 - cob);
+        const forest = RC.smooth01((under - 0.3) / 0.4) * (1 - cob) * 0.85, sand = Math.max(RC.smooth01((water - 0.2) / 0.35), bare, this.stream ? this.stream.bed(wx, wz) * 0.9 : 0) * (1 - cob);
         dirt *= 1 - forest; const sum = cob + dirt + forest + sand, k = sum > 1 ? 1 / sum : 1;
         d[i] = cob * k * 255; d[i + 1] = dirt * k * 255; d[i + 2] = forest * k * 255; d[i + 3] = sand * k * 255;
       }
@@ -212,6 +220,7 @@
       const cv = document.createElement('canvas'); cv.width = this.w; cv.height = this.h; const g = cv.getContext('2d');
       const col = { '.': '#5fae46', ',': '#86c95f', '-': '#c79a4b', '~': '#2b6cb0', '=': '#8b5a2b', T: '#2f6b2a', L: '#e5e7eb' };
       for (let r = 0; r < this.h; r++) for (let c = 0; c < this.w; c++) { g.fillStyle = col[this.paint[r][c]] || '#5fae46'; g.fillRect(c, r, 1, 1); }
+      if (this.stream) this.stream.drawMini(g);
       return cv;
     }
   };

@@ -51,7 +51,7 @@
     // each cover's share at a point in the world
     masks() {
       const vn = RC.Covers.vnoise, grass = (k) => k === '.' || k === ',';   // (kept / natural: this.kept)
-      const free = (x, z) => !this.solid[Math.floor(z) * this.W + Math.floor(x)] && !this.inBuilding(x, z) && this.terrain.soft('-', x, z) < 0.42 + (RC.fbm(x, z, 0.9, 4, 33) - 0.5) * 0.75;   // grass creeps onto the road edges along the same ragged line
+      const free = (x, z) => !this.solid[Math.floor(z) * this.W + Math.floor(x)] && !this.inBuilding(x, z) && !(this.terrain.stream && this.terrain.stream.wet(x, z, 0.3)) && this.terrain.soft('-', x, z) < 0.42 + (RC.fbm(x, z, 0.9, 4, 33) - 0.5) * 0.75;   // grass creeps onto the road edges along the same ragged line
       const gaps = (x, z) => RC.smooth01((vn(x + 40, z + 40, 2.6, 11) - 0.22) / 0.25);   // bare earth here and there
       const tuft = (x, z) => 0.3 + 0.7 * RC.smooth01((vn(x + 11, z + 7, 0.5, 93) * 0.7 + vn(x, z, 0.21, 94) * 0.3 - 0.3) / 0.4);   // grass grows in clumps and tussocks, not an even fur
       return {

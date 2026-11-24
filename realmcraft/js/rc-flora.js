@@ -220,7 +220,7 @@
     for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (P[r][c] === 'T') {
       const n = noise(c, r, 6), northness = 1 - r / H, h = RC.hash(c, r, 79);
       const kind = h < northness * 0.55 && n > 0.35 ? 'pine' : n < 0.3 ? 'birch' : n < 0.62 ? 'oak' : 'maple';
-      const tx = c + 0.5 + (RC.hash(c, r, 5) - 0.5) * 0.7, tz = r + 0.5 + (RC.hash(r, c, 6) - 0.5) * 0.7; if (clear(tx, tz)) trees[kind].push([tx, tz, h]);
+      const tx = c + 0.5 + (RC.hash(c, r, 5) - 0.5) * 0.7, tz = r + 0.5 + (RC.hash(r, c, 6) - 0.5) * 0.7; if (clear(tx, tz) && !(terrain.stream && terrain.stream.clear(tx, tz, 0.9))) trees[kind].push([tx, tz, h]);
     }
     const tm = new T.Matrix4(), qu = new T.Quaternion(), sc = new T.Vector3(), ps = new T.Vector3(), up = new T.Vector3(0, 1, 0), col = new T.Color();
     const seasonal = [];   // leaf meshes and their species, recoloured when the season turns
@@ -243,6 +243,7 @@
       const k = P[r][c]; if (k !== '.' && k !== ',') continue;
       const h = RC.hash(c, r, 91), h2 = RC.hash(r, c, 92), edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dc, dr]) => at(c + dc, r + dr) === 'T'), wet = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dc, dr]) => at(c + dc, r + dr) === '~');
       const x = c + 0.2 + h2 * 0.6, z = r + 0.2 + RC.hash(c * 3, r, 93) * 0.6;
+      if (terrain.stream && terrain.stream.clear(x, z, 0.4)) continue;
       if (wet && h < 0.55) brush.reed.push([x, z, h]);
       else if (edge && h < 0.6) brush[h < 0.22 ? 'fern' : h < 0.36 ? 'bush' : h < 0.44 ? 'sapling' : h < 0.52 ? 'berry' : 'rock'].push([x, z, h2]);
       else if (k === '.' && h < 0.075) brush[h < 0.025 ? 'bush' : h < 0.045 ? 'fern' : h < 0.06 ? 'rock' : 'blossom'].push([x, z, h2]);
