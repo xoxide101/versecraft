@@ -35,6 +35,7 @@
       const map = RC.MapCraft.build(THREE, realm, sim.terrain, this.shared);
       this.scene.add(map.group); this.labels = map.labels; this.tickers = map.tickers; this.buildings = map.buildings;
       this.scene.add(this.cover.group);   // grasses, reeds, wildflowers (rc-groundcover.js)
+      this.horizon = new RC.Horizon(THREE, realm, sim.terrain); this.scene.add(this.horizon.group);   // forest, hills, mountains, the tower, the sea (rc-horizon.js)
       // the cast
       this.rigs = new Map();
       for (const p of [...sim.people, ...sim.players]) {
@@ -131,7 +132,7 @@
         rg.root.position.set(p.x, sim.terrain.groundY(p.x, p.z), p.z); rg.root.rotation.y = Math.PI / 2 - p.angle;
         if (p.ring !== 'far' || (this.frameN = (this.frameN || 0) + 1) % 4 === 0) rg.update(p, t);   // detail rings: far bodies animate less often
       }
-      this.cover.update(pl.x, pl.z);
+      this.cover.update(pl.x, pl.z); this.horizon.update(this.scene.fog.color, this.night);
       this.shared.uRain.value = RC.damp(this.shared.uRain.value, sim.weather === 'storm' ? 1 : sim.weather === 'rain' ? 0.7 : 0, 0.5, dt);
       for (const fn of this.tickers) fn(t, { night: this.night, cam: this.cam, season: now.seasonIndex });
       if (this.bloom) { this.bloom.strength = 0.02 + this.night * 0.55; this.bloom.threshold = RC.lerp(1.6, 0.9, this.night); }   // (by day the sky must not glow)
