@@ -11,9 +11,17 @@
       this.w = w; this.h = h; this.paint = def.paint; this.legend = def.legend || {}; this.shape = def.shape || [];
       this.sea = this.shape.find((s) => s.op === 'sea') || { floor: -0.6 };
       this.waterY = -0.05; this.pierY = 0.16;
+      this.kept = null; this.worn = null;   // set by the realm (rc-groundcover.js): how tended the ground is, how worn
     }
     cell(x, z) { const c = Math.floor(x), r = Math.floor(z); if (r < 0 || r >= this.h || c < 0 || c >= this.w) return 'T'; return this.paint[r][c]; }
     isWater(x, z) { return WATERISH.has(this.cell(x, z)); }
+    // how much of a ground kind is here, 0..1, with soft ragged borders (no cell squares): for colours and covers
+    soft(kind, x, z) {
+      const key = 'soft' + kind; if (!this[key]) { const a = new Float32Array(this.w * this.h); for (let r = 0; r < this.h; r++) for (let c = 0; c < this.w; c++) a[r * this.w + c] = this.paint[r][c] === kind ? 1 : 0; this[key] = a; }
+      const A = this[key], wx = x + (RC.fbm(x, z, 2.5, 3, 91) - 0.5) * 1.6, wz = z + (RC.fbm(x + 50, z, 2.5, 3, 92) - 0.5) * 1.6;
+      const X = RC.clamp(wx - 0.5, 0, this.w - 1.001), Z = RC.clamp(wz - 0.5, 0, this.h - 1.001), c = Math.floor(X), r = Math.floor(Z), fx = RC.smooth01(X - c), fz = RC.smooth01(Z - r), g = (cc, rr) => A[Math.min(this.h - 1, rr) * this.w + Math.min(this.w - 1, cc)];
+      return RC.lerp(RC.lerp(g(c, r), g(c + 1, r), fx), RC.lerp(g(c, r + 1), g(c + 1, r + 1), fx), fz);
+    }
     // the land's own height (no water): the shaping steps
     land(x, z) {
       let y = 0;
@@ -75,13 +83,23 @@
           for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nk = at(c + dc, r + dr); if (nk === '.' || nk === ',') { g.fillStyle = 'rgba(110,90,60,.35)'; for (let i = 0; i < 6; i++) { const ex = dc ? (dc > 0 ? x + P - 2 - RC.hash(c, r, i) * P * 0.25 : x + RC.hash(c, r, i) * P * 0.25) : x + RC.hash(c, r, i + 9) * P, ey = dr ? (dr > 0 ? y + P - 2 - RC.hash(r, c, i) * P * 0.25 : y + RC.hash(r, c, i) * P * 0.25) : y + RC.hash(r, c, i + 9) * P; g.beginPath(); g.arc(ex, ey, 1.5 + RC.hash(c, r, i + 20) * 2.5, 0, 7); g.fill(); } } }
         } else if (k === '=') { g.fillStyle = '#8b5a2b'; g.fillRect(x, y, P, P); }
         else if (k === '~') { g.fillStyle = `hsl(42, 35%, ${58 + big(c, r, 3, 5) * 10}%)`; g.fillRect(x, y, P, P); }   // sand under the water
-        else {   // grass and meadow: mottled in big soft patches, blades and specks, flowers on meadow
-          const patch = big(c, r, 5, 11) * 0.6 + big(c, r, 2, 12) * 0.4, meadow = k === ',';
-          g.fillStyle = `hsl(${meadow ? 92 : 98 + patch * 10}, ${meadow ? 46 : 42 + patch * 10}%, ${(meadow ? 50 : 38) + patch * 10}%)`; g.fillRect(x, y, P, P);
-          for (let i = 0; i < P * 0.7; i++) { const h = RC.hash(c * 31 + i, r, 13); g.fillStyle = h < 0.5 ? 'rgba(30,70,20,.28)' : 'rgba(190,230,140,.22)'; g.fillRect(x + RC.hash(c, r * 31 + i, 14) * P, y + RC.hash(c + i, r, 15) * P, 1, 2 + h * 2); gh.fillStyle = h < 0.5 ? '#6a6a6a' : '#8a8a8a'; gh.fillRect(x + RC.hash(c, r * 31 + i, 14) * P, y + RC.hash(c + i, r, 15) * P, 1, 2); }
-          if (meadow) for (let i = 0; i < 4; i++) { const t = RC.hash(c * 3 + i, r, 11); if (t < 0.55) { g.fillStyle = ['#fff7d6', '#fda4af', '#fde047', '#c4b5fd', '#ffffff'][Math.floor(t * 11) % 5]; g.beginPath(); g.arc(x + RC.hash(c, r * 3 + i, 5) * P, y + RC.hash(c * 7, r + i, 9) * P, 1.6, 0, 7); g.fill(); } }
-          if (k === 'T') { g.fillStyle = 'rgba(50,40,20,.35)'; g.fillRect(x, y, P, P); }   // leaf litter under the trees
-          if (big(c, r, 9, 16) > 0.86 && !meadow && k !== 'T') { g.fillStyle = 'rgba(120,100,60,.18)'; g.beginPath(); g.arc(x + P / 2, y + P / 2, P * 0.6, 0, 7); g.fill(); }   // a worn patch now and then
+        else {   // grass and meadow: painted per small block from fractal noise (no cell squares), fractal dirt where it's worn
+          const B = 4;
+          for (let by = 0; by < P; by += B) for (let bx = 0; bx < P; bx += B) {
+            const wx = c + (bx + B / 2) / P, wz = r + (by + B / 2) / P;
+            const patch = RC.fbm(wx, wz, 7, 4, 3), tone = RC.fbm(wx, wz, 1.6, 3, 9);
+            const kept = this.kept ? this.kept(wx, wz) : 0, meadow = this.soft(',', wx, wz), under = this.soft('T', wx, wz);
+            let hh = 92 + patch * 16 - meadow * 4, ss = 38 + patch * 14 + meadow * 6 - kept * 4, ll = 32 + patch * 12 + tone * 6 + meadow * 8 + kept * 3;
+            // dirt: a fractal mask, more of it near roads (worn) and in the wild, less on kept lawns
+            const worn = this.worn ? this.worn(wx, wz) : 0, dirt = RC.smooth01((RC.fbm(wx + 31, wz + 17, 3.2, 5, 5) - 0.6 + worn * 0.35 - kept * 0.12) / 0.08);
+            if (dirt > 0) { hh = RC.lerp(hh, 30 + tone * 8, dirt); ss = RC.lerp(ss, 26 + tone * 8, dirt); ll = RC.lerp(ll, 26 + tone * 10, dirt); }
+            hh -= under * 6; ll -= under * 8; ss -= under * 6;   // under the trees: darker, leaf litter (fading out at the edge)
+            g.fillStyle = `hsl(${hh}, ${ss}%, ${ll}%)`; g.fillRect(x + bx, y + by, B, B);
+            gh.fillStyle = dirt > 0.5 ? '#6c6c6c' : '#7a7a7a'; gh.fillRect(x + bx, y + by, B, B);
+          }
+          for (let i = 0; i < P * 0.7; i++) { const h = RC.hash(c * 31 + i, r, 13); g.fillStyle = h < 0.5 ? 'rgba(30,70,20,.22)' : 'rgba(190,230,140,.16)'; const sx = x + RC.hash(c, r * 31 + i, 14) * P, sy = y + RC.hash(c + i, r, 15) * P; g.fillRect(sx, sy, 1, 2 + h * 2); gh.fillStyle = h < 0.5 ? '#606060' : '#949494'; gh.fillRect(sx, sy, 1, 2); }
+          for (let i = 0; i < 3; i++) { const sx = x + RC.hash(c * 5 + i, r, 41) * P, sy = y + RC.hash(c, r * 5 + i, 42) * P; if (RC.hash(c + i, r, 43) < 0.35) { g.fillStyle = `rgba(${90 + i * 10},${80 + i * 8},${70},.5)`; g.beginPath(); g.arc(sx, sy, 1 + RC.hash(c, r, 44 + i), 0, 7); g.fill(); gh.fillStyle = '#b0b0b0'; gh.beginPath(); gh.arc(sx, sy, 1.2, 0, 7); gh.fill(); } }   // pebbles
+          if (k === ',') for (let i = 0; i < 4; i++) { const t2 = RC.hash(c * 3 + i, r, 11); if (t2 < 0.55) { g.fillStyle = ['#fff7d6', '#fda4af', '#fde047', '#c4b5fd', '#ffffff'][Math.floor(t2 * 11) % 5]; g.beginPath(); g.arc(x + RC.hash(c, r * 3 + i, 5) * P, y + RC.hash(c * 7, r + i, 9) * P, 1.6, 0, 7); g.fill(); } }
         }
       }
       g.filter = 'blur(0.8px)'; g.drawImage(cv, 0, 0); g.filter = 'none';

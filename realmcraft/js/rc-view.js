@@ -29,11 +29,12 @@
       sc.mapSize.set(RC.quality.shadowMap, RC.quality.shadowMap); sc.camera.left = sc.camera.bottom = -26; sc.camera.right = sc.camera.top = 26; sc.camera.near = 1; sc.camera.far = 120; sc.bias = -0.0004; sc.normalBias = 0.03;
       this.scene.add(this.sun, this.sun.target);
       this.shared = { uTime: { value: 0 }, uWind: { value: new THREE.Vector3(0.3, 0.1, 0.4) }, uCam: { value: new THREE.Vector3() }, uPlayer: { value: new THREE.Vector3() }, uRain: { value: 0 } };
-      // the land and what's on it
+      // the land and what's on it (the ground cover first: it tells the ground picture what's tended and what's worn)
+      this.cover = new RC.GroundCover(THREE, realm, sim.terrain, sim.plan, this.shared);
       this.scene.add(sim.terrain.build(THREE));
       const map = RC.MapCraft.build(THREE, realm, sim.terrain, this.shared);
       this.scene.add(map.group); this.labels = map.labels; this.tickers = map.tickers; this.buildings = map.buildings;
-      this.cover = new RC.GroundCover(THREE, realm, sim.terrain, sim.plan, this.shared); this.scene.add(this.cover.group);   // grasses, reeds, wildflowers (rc-groundcover.js)
+      this.scene.add(this.cover.group);   // grasses, reeds, wildflowers (rc-groundcover.js)
       // the cast
       this.rigs = new Map();
       for (const p of [...sim.people, ...sim.players]) {
@@ -53,9 +54,9 @@
       if (RC.quality.tier !== 'low') {
         try {
           const c = (this.composer = new THREE.EffectComposer(r)); c.addPass(new THREE.RenderPass(this.scene, this.camera));
-          this.ao = new THREE.GTAOPass(this.scene, this.camera, 800, 600); this.ao.blendIntensity = 0.85;
+          this.ao = RC.aoSkipCutouts(new THREE.GTAOPass(this.scene, this.camera, 800, 600)); this.ao.blendIntensity = 0.85;
           this.ao.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.2, thickness: 1.2, scale: 1, samples: RC.quality.tier === 'high' ? 16 : 10 }); c.addPass(this.ao);
-          this.bloom = new THREE.UnrealBloomPass(new THREE.Vector2(800, 600), 0.25, 0.5, 0.88); c.addPass(this.bloom);
+          this.bloom = new THREE.UnrealBloomPass(new THREE.Vector2(800, 600), 0.05, 0.45, 1.15);   // (only really bright things glow: lamp flames, lit windows) c.addPass(this.bloom);
           c.addPass(new THREE.OutputPass());
         } catch (e) { console.warn('after-effects off:', e); this.composer = null; }
       }
@@ -100,6 +101,7 @@
       else {
         if (sim.viewMode === 'map') { dist = Math.max(this.realm.w, this.realm.h) * 1.18 + 10; tx = RC.lerp(this.realm.w / 2, pl.x, 0.22); tz = RC.lerp(this.realm.h / 2, pl.z, 0.22); }
         dist *= sim.zoom; if (sim.zoom < 0.4) { const k = (0.4 - sim.zoom) / 0.3; elev = RC.lerp(elev, 0.3, k); lookY = RC.lerp(0.35, 0.9, k); }
+        elev = RC.clamp(elev + (sim.tilt || 0), 0.03, 1.5);   // your tilt on top of the view's own angle
       }
       const c = this.cam, ty = sim.terrain.groundY(tx, tz);
       if (!c.init) Object.assign(c, { x: tx, y: ty, z: tz, dist, elev, look: lookY, init: true });
@@ -132,7 +134,7 @@
       this.cover.update(pl.x, pl.z);
       this.shared.uRain.value = RC.damp(this.shared.uRain.value, sim.weather === 'storm' ? 1 : sim.weather === 'rain' ? 0.7 : 0, 0.5, dt);
       for (const fn of this.tickers) fn(t, { night: this.night, cam: this.cam, season: now.seasonIndex });
-      if (this.bloom) this.bloom.strength = 0.18 + this.night * 0.55;
+      if (this.bloom) { this.bloom.strength = 0.02 + this.night * 0.55; this.bloom.threshold = RC.lerp(1.6, 0.9, this.night); }   // (by day the sky must not glow)
       if (RC.settings.seeThrough === 'fade') this.fadeBlockers(pl);
       if (this.composer) this.composer.render(dt); else this.renderer.render(this.scene, this.camera);
     }

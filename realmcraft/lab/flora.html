@@ -38,7 +38,7 @@
 
   // ---------------------------------------------------------------- the ground: a fine grass picture with bumps (no 3D grass needed in the open)
   const S = 1024, gc = RC.Tex.cv(S, S), gh = RC.Tex.cv(S, S), g = gc.getContext('2d'), hg = gh.getContext('2d');
-  for (let y = 0; y < S; y += 4) for (let x = 0; x < S; x += 4) { const p = RC.hash(x >> 6, y >> 6, 3) * 0.5 + RC.hash(x >> 5, y >> 5, 4) * 0.3 + RC.hash(x >> 3, y >> 3, 5) * 0.2; g.fillStyle = `hsl(${96 + p * 12}, ${40 + p * 12}%, ${34 + p * 12}%)`; g.fillRect(x, y, 4, 4); }
+  for (let y = 0; y < S; y += 4) for (let x = 0; x < S; x += 4) { const p = RC.fbm(x, y, 160, 4, 3), d = RC.smooth01((RC.fbm(x + 500, y, 120, 5, 5) - 0.62) / 0.06); g.fillStyle = `hsl(${RC.lerp(94 + p * 14, 32, d)}, ${RC.lerp(38 + p * 14, 28, d)}%, ${RC.lerp(30 + p * 14, 28, d)}%)`; g.fillRect(x, y, 4, 4); }
   hg.fillStyle = '#707070'; hg.fillRect(0, 0, S, S);
   for (let i = 0; i < 60000; i++) {   // thousands of tiny blades seen from above: light tips, dark gaps, each a little ridge in the bump map
     const x = Math.random() * S, y = Math.random() * S, a = (Math.random() - 0.5) * 1.2, l = 3 + Math.random() * 7, light = Math.random();
@@ -157,7 +157,7 @@
   let windK = 0.4, hour = 14; slider('wind', 0, 1.6, 0.4, (v) => { windK = v; }, true); slider('hour', 5, 20, 14, (v) => { hour = v; }, true);
   const info = document.createElement('span'); info.style.color = 'var(--dim)'; info.style.marginLeft = '8px'; bar.append(info);
   growGrass();
-  const comp = new T.EffectComposer(rd); comp.addPass(new T.RenderPass(scene, cam)); const ao = new T.GTAOPass(scene, cam, 800, 600); ao.blendIntensity = 0.85; ao.updateGtaoMaterial({ radius: 0.3, distanceExponent: 1.2, thickness: 1, scale: 1, samples: 16 }); comp.addPass(ao); comp.addPass(new T.OutputPass());
+  const comp = new T.EffectComposer(rd); comp.addPass(new T.RenderPass(scene, cam)); const ao = RC.aoSkipCutouts(new T.GTAOPass(scene, cam, 800, 600)); ao.blendIntensity = 0.85; ao.updateGtaoMaterial({ radius: 0.3, distanceExponent: 1.2, thickness: 1, scale: 1, samples: 16 }); comp.addPass(ao); comp.addPass(new T.OutputPass());
   const resize = () => { const w = innerWidth, h = innerHeight; rd.setSize(w, h); comp.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); }; resize(); addEventListener('resize', resize);
   const clock = new T.Clock();
   (function frame() {

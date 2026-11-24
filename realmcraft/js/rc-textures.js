@@ -57,7 +57,8 @@
       } else if (kind === 'reed') {
         for (let i = 0; i < 24; i++) { const x = 20 + r() * (S - 40), h = S * (0.6 + r() * 0.4); g.strokeStyle = `rgb(${120 + r() * 40},${140 + r() * 40},${70 + r() * 20})`; g.lineWidth = 3; g.beginPath(); g.moveTo(x, S); g.lineTo(x + (r() - 0.5) * 20, S - h); g.stroke(); if (r() < 0.4) { g.fillStyle = '#6b4a2b'; g.fillRect(x - 3 + (r() - 0.5) * 10, S - h + 4, 6, 22); } }
       } else {   // broad leaves (oak, maple, birch, bush), some with blossoms or berries
-        const n = kind === 'birch' ? 260 : 180, L = kind === 'birch' ? 16 : kind === 'maple' ? 24 : 22, Wd = kind === 'birch' ? 6 : kind === 'maple' ? 11 : 9;
+        const n = { birch: 260, box: 520, frost: 340 }[kind] || 180, L = { birch: 16, maple: 24, box: 11, frost: 20 }[kind] || 22, Wd = { birch: 6, maple: 11, box: 6.5, frost: 4.2 }[kind] || 9;
+        if (kind === 'box') { g.fillStyle = 'rgb(140,146,130)'; g.beginPath(); g.arc(S / 2, S / 2, S * 0.26, 0, 7); g.fill(); }   // box: packed tight in the middle, leafy edges (no flat paper)
         for (let i = 0; i < n; i++) { const a = r() * 6.28, rad = Math.sqrt(r()) * (S * 0.44); leaf(S / 2 + Math.cos(a) * rad, S / 2 + Math.sin(a) * rad, L * (0.7 + r() * 0.5), Wd, r() * 6.28, shade(1)); }
         if (kind === 'blossom') for (let i = 0; i < 70; i++) { const x = 20 + r() * (S - 40), y = 20 + r() * (S - 40); g.fillStyle = r() < 0.5 ? '#ffd1e8' : '#ffffff'; for (let p = 0; p < 5; p++) { g.beginPath(); g.arc(x + Math.cos(p * 1.26) * 4, y + Math.sin(p * 1.26) * 4, 3.2, 0, 7); g.fill(); } g.fillStyle = '#fbbf24'; g.beginPath(); g.arc(x, y, 2, 0, 7); g.fill(); }
         if (kind === 'berry') for (let i = 0; i < 60; i++) { g.fillStyle = r() < 0.7 ? '#b3123a' : '#5b1a6b'; g.beginPath(); g.arc(20 + r() * (S - 40), 20 + r() * (S - 40), 4, 0, 7); g.fill(); }

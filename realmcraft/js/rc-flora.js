@@ -13,7 +13,7 @@
   };
   const BUSHES = {
     bush: { leaf: 'oak', r: 0.55, cards: 14, size: 0.42, color: '#4c8a36' }, berry: { leaf: 'berry', r: 0.5, cards: 13, size: 0.4, color: '#3f7d32' }, blossom: { leaf: 'blossom', r: 0.55, cards: 14, size: 0.44, color: '#5a9a45' },
-    frost_bush: { leaf: 'birch', r: 0.5, cards: 13, size: 0.36, color: '#86b5aa' }, box: { leaf: 'birch', r: 0.42, cards: 16, size: 0.3, color: '#3d7a3a' }, fern: { fern: true, color: '#4f9a35' }, ember_fern: { fern: true, color: '#9a5a2a' }, sapling: { leaf: 'birch', r: 0.35, cards: 7, color: '#7fbe4a', stem: 0.8 },
+    frost_bush: { leaf: 'frost', r: 0.5, cards: 15, size: 0.4, color: '#9cc4bd' }, box: { leaf: 'box', r: 0.42, cards: 20, size: 0.3, color: '#3f7a34', squash: 0.92 }, fern: { fern: true, color: '#4f9a35' }, ember_fern: { fern: true, color: '#9a5a2a' }, sapling: { leaf: 'birch', r: 0.35, cards: 7, color: '#7fbe4a', stem: 0.8 },
   };
   RC.Flora = { SPECIES, BUSHES };
   const V3 = (x, y, z) => ({ x, y, z });
@@ -111,26 +111,43 @@
       for (let i = 0; i < n; i++) { const p = new T.PlaneGeometry(0.42, 0.95); p.translate(0, 0.47, 0); p.rotateX(0.55 + r() * 0.5); p.rotateY((i / n) * 6.28 + r() * 0.4); const pos = p.attributes.position, nor = p.attributes.normal, col = new Float32Array(pos.count * 3), k = 0.8 + r() * 0.3; for (let j = 0; j < pos.count; j++) { const l = Math.hypot(pos.getX(j), 1, pos.getZ(j)); nor.setXYZ(j, pos.getX(j) / l, 1 / l, pos.getZ(j) / l); col[j * 3] = col[j * 3 + 1] = col[j * 3 + 2] = k; } p.setAttribute('color', new T.BufferAttribute(col, 3)); out.push(p); }
       return { leaves: T.BufferGeometryUtils.mergeGeometries(out), leaf: 'fern', color: b.color };
     }
-    const R0 = b.r, st = b.stem || 0, mid = V3(0, R0 * 0.78 + st, 0), Z = new T.Vector3(0, 0, 1);
+    const R0 = b.r, st = b.stem || 0, mid = V3(0, R0 * 0.72 + st, 0), Z = new T.Vector3(0, 0, 1), size = b.size || 0.42;
     if (st) stems.push(limb(T, V3(0, -0.05, 0), V3(0, st + 0.2, 0), 0.04, 0.02, 5));
-    blob(T, V3(mid.x, mid.y - R0 * 0.08, mid.z), R0 * 0.74, mid, r, fill, 0.72, 0.5);   // the dark core: no see-through gaps, gives depth between leaves
-    const n = Math.round(b.cards * 3.4 * Math.max(0.6, detail)), size = b.size || 0.42;
-    for (let i = 0; i < n; i++) {
-      // spread evenly over the dome (a golden-angle spiral from the top down to just below the middle)
-      const t = (i + 0.5) / n, y = 1 - t * 1.32, ring = Math.sqrt(Math.max(0, 1 - y * y)) * (y < 0 ? 1 + y * 0.6 : 1), phi = i * 2.39996 + r() * 0.3;
-      const dir = new T.Vector3(Math.cos(phi) * ring, y, Math.sin(phi) * ring), lump = 0.86 + r() * 0.26;
-      const at = new T.Vector3(mid.x + dir.x * R0 * lump, mid.y + dir.y * R0 * 0.82 * lump, mid.z + dir.z * R0 * lump);
-      const p = new T.PlaneGeometry(size, size, 2, 2), pp = p.attributes.position;
-      for (let j = 0; j < pp.count; j++) { const x = pp.getX(j), yy = pp.getY(j); pp.setZ(j, -((x * x + yy * yy) / (size * size)) * size * 0.5); }
-      const face = dir.clone().setY(Math.max(dir.y, 0.15)).add(new T.Vector3(r() - 0.5, r() - 0.2, r() - 0.5).multiplyScalar(0.9)).normalize();
-      p.applyQuaternion(new T.Quaternion().setFromAxisAngle(Z, r() * 6.28)); p.applyQuaternion(new T.Quaternion().setFromUnitVectors(Z, face)); p.translate(at.x, at.y, at.z);
-      const pos = p.attributes.position, nor = p.attributes.normal, col = new Float32Array(pos.count * 3);
-      for (let j = 0; j < pos.count; j++) {
-        const nx = pos.getX(j) - mid.x, ny = (pos.getY(j) - mid.y) * 1.2 + 0.15, nz = pos.getZ(j) - mid.z, l = Math.hypot(nx, ny, nz) || 1; nor.setXYZ(j, nx / l, ny / l, nz / l);
-        const k = (0.6 + 0.4 * RC.clamp(ny / l + 0.2, 0, 1)) * (0.9 + r() * 0.2);   // lighter on top, darker underneath
-        col[j * 3] = col[j * 3 + 1] = col[j * 3 + 2] = k;
+    // a real shrub is lumpy: a main mass and 2-4 smaller lobes, uneven in size and height (a box stays tidier)
+    const tidy = kind === 'box' ? 0.45 : 1, lobes = [{ c: V3((r() - 0.5) * 0.1, mid.y, (r() - 0.5) * 0.1), R: R0 }];
+    for (let k = 0, n = 2 + Math.floor(r() * 3); k < n; k++) {
+      const a = (k / n) * 6.28 + r() * 1.2, off = R0 * (0.45 + r() * 0.35) * tidy, rr = R0 * (0.5 + r() * 0.3);
+      lobes.push({ c: V3(Math.cos(a) * off, Math.max(rr * 0.55 + st, mid.y + (r() - 0.6) * R0 * 0.5 * tidy), Math.sin(a) * off), R: rr });
+    }
+    const inOther = (p, me) => lobes.some((L) => L !== me && Math.hypot(p.x - L.c.x, (p.y - L.c.y) / 0.82, p.z - L.c.z) < L.R * 0.8);
+    for (const L of lobes) {
+      blob(T, V3(L.c.x, L.c.y - L.R * 0.05, L.c.z), L.R * 0.64, mid, r, fill, 0.76, 0.58);   // each lobe's core, kept inside its leaves
+      const n = Math.round(b.cards * 3.4 * Math.max(0.6, detail) * (L.R / R0) * (L.R / R0) * 1.15);
+      for (let i = 0; i < n; i++) {
+        const tt = (i + 0.5) / n, y = 1 - tt * 1.32, ring = Math.sqrt(Math.max(0, 1 - y * y)) * (y < 0 ? 1 + y * 0.6 : 1), phi = i * 2.39996 + r() * 0.3;
+        const dir = new T.Vector3(Math.cos(phi) * ring, y, Math.sin(phi) * ring), lump = 0.84 + r() * 0.3;
+        const at = new T.Vector3(L.c.x + dir.x * L.R * lump, L.c.y + dir.y * L.R * 0.82 * lump, L.c.z + dir.z * L.R * lump);
+        if (at.y < 0.1 || inOther(at, L)) continue;   // nothing on the ground; nothing buried inside another lobe
+        const sz = size * (0.5 + 0.5 * RC.smooth01((y + 0.35) / 0.65)) * (0.85 + r() * 0.3);
+        const p = new T.PlaneGeometry(sz, sz, 2, 2), pp = p.attributes.position;
+        for (let j = 0; j < pp.count; j++) { const x = pp.getX(j), yy = pp.getY(j); pp.setZ(j, -((x * x + yy * yy) / (sz * sz)) * sz * 0.5); }
+        const face = dir.clone().setY(Math.max(dir.y, y < 0 ? 0.45 : 0.15)).add(new T.Vector3(r() - 0.5, r() - 0.2, r() - 0.5).multiplyScalar(0.9)).normalize();
+        p.applyQuaternion(new T.Quaternion().setFromAxisAngle(Z, r() * 6.28)); p.applyQuaternion(new T.Quaternion().setFromUnitVectors(Z, face)); p.translate(at.x, at.y, at.z);
+        const pos = p.attributes.position, nor = p.attributes.normal, col = new Float32Array(pos.count * 3);
+        for (let j = 0; j < pos.count; j++) {   // light from the lobe and the whole bush together: each lobe rounds, the bush still reads as one
+          const nx = (pos.getX(j) - L.c.x) + (pos.getX(j) - mid.x) * 0.5, ny = (pos.getY(j) - L.c.y) * 1.2 + (pos.getY(j) - mid.y) * 0.4 + 0.15, nz = (pos.getZ(j) - L.c.z) + (pos.getZ(j) - mid.z) * 0.5, l = Math.hypot(nx, ny, nz) || 1; nor.setXYZ(j, nx / l, ny / l, nz / l);
+          const k = (0.6 + 0.4 * RC.clamp(ny / l + 0.2, 0, 1)) * (0.9 + r() * 0.2);
+          col[j * 3] = col[j * 3 + 1] = col[j * 3 + 2] = k;
+        }
+        p.setAttribute('color', new T.BufferAttribute(col, 3)); out.push(p.index ? p.toNonIndexed() : p);
       }
-      p.setAttribute('color', new T.BufferAttribute(col, 3)); out.push(p.index ? p.toNonIndexed() : p);
+    }
+    // sprigs: a few stems poking out past the outline with a small tuft at the end (not on a clipped box)
+    for (let k = 0, n = kind === 'box' ? 0 : 2 + Math.floor(r() * 4); k < n; k++) {
+      const a = r() * 6.28, from = V3(Math.cos(a) * R0 * 0.3, mid.y * (0.5 + r() * 0.5), Math.sin(a) * R0 * 0.3), len = R0 * (1.05 + r() * 0.45);
+      const tip = V3(Math.cos(a) * len, from.y + R0 * (0.15 + r() * 0.55), Math.sin(a) * len);
+      stems.push(limb(T, from, tip, 0.014, 0.006, 4));
+      cluster(T, tip, 0.1, 3 + Math.floor(r() * 3), size * 0.6, tip, r, out, 1);
     }
     const M = (a) => T.BufferGeometryUtils.mergeGeometries(a.map((g) => (g.index ? g.toNonIndexed() : g)));
     return { leaves: M(out), fill: fill.length ? M(fill) : null, bark: stems.length ? M(stems) : null, leaf: b.leaf, color: b.color };
@@ -176,11 +193,13 @@
     const at = (c, r) => (r < 0 || r >= H || c < 0 || c >= W ? 'T' : P[r][c]);
     const noise = (c, r, s) => (RC.hash(Math.floor(c / s), Math.floor(r / s), 77) + RC.hash(Math.floor(c / (s * 2)), Math.floor(r / (s * 2)), 78)) / 2;
     // where each species grows: pines toward the north edge, birch in clumps, oak and maple elsewhere
+    const spots = realm.things.filter((t) => t.kind !== 'building' && t.kind !== 'boat' && t.kind !== 'lamp').map((t) => [t.x, t.z]);
+    const clear = (x, z) => !spots.some(([sx, sz]) => Math.abs(sx - x) < 1.3 && Math.abs(sz - z) < 1.3);
     const trees = { oak: [], maple: [], birch: [], pine: [] };
     for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (P[r][c] === 'T') {
       const n = noise(c, r, 6), northness = 1 - r / H, h = RC.hash(c, r, 79);
       const kind = h < northness * 0.55 && n > 0.35 ? 'pine' : n < 0.3 ? 'birch' : n < 0.62 ? 'oak' : 'maple';
-      trees[kind].push([c + 0.5 + (RC.hash(c, r, 5) - 0.5) * 0.7, r + 0.5 + (RC.hash(r, c, 6) - 0.5) * 0.7, h]);
+      const tx = c + 0.5 + (RC.hash(c, r, 5) - 0.5) * 0.7, tz = r + 0.5 + (RC.hash(r, c, 6) - 0.5) * 0.7; if (clear(tx, tz)) trees[kind].push([tx, tz, h]);
     }
     const tm = new T.Matrix4(), qu = new T.Quaternion(), sc = new T.Vector3(), ps = new T.Vector3(), up = new T.Vector3(0, 1, 0), col = new T.Color();
     const seasonal = [];   // leaf meshes and their species, recoloured when the season turns

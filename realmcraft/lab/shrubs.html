@@ -23,6 +23,7 @@
 <script src="../js/rc-core.js"></script>
 <script src="../js/rc-textures.js"></script>
 <script src="../js/rc-flora.js"></script>
+<script src="../js/rc-covers.js"></script>
 <script>
 (function () {
   const T = THREE;
@@ -37,7 +38,7 @@
   const shared = { uTime: { value: 0 }, uWind: { value: new T.Vector3(0.2, 0.1, 0.4) } };
   // ground: soft mottled grass with relief, and grass clumps around
   const gc = RC.Tex.cv(512, 512), gh = RC.Tex.cv(512, 512), g = gc.getContext('2d'), hg = gh.getContext('2d'); hg.fillStyle = '#808080'; hg.fillRect(0, 0, 512, 512);
-  for (let y = 0; y < 512; y += 8) for (let x = 0; x < 512; x += 8) { const p = RC.hash(x >> 5, y >> 5, 3) * 0.6 + RC.hash(x >> 4, y >> 4, 4) * 0.4; g.fillStyle = `hsl(${98 + p * 10}, ${44 + p * 10}%, ${38 + p * 10}%)`; g.fillRect(x, y, 8, 8); }
+  for (let y = 0; y < 512; y += 2) for (let x = 0; x < 512; x += 2) { const p = RC.fbm(x, y, 96, 4, 3), d = RC.smooth01((RC.fbm(x + 300, y, 70, 5, 5) - 0.62) / 0.06); g.fillStyle = `hsl(${RC.lerp(96 + p * 14, 32, d)}, ${RC.lerp(40 + p * 14, 28, d)}%, ${RC.lerp(32 + p * 14, 28, d)}%)`; g.fillRect(x, y, 2, 2); }
   for (let i = 0; i < 9000; i++) { const x = Math.random() * 512, y = Math.random() * 512, l = Math.random() < 0.5; g.fillStyle = l ? 'rgba(190,230,140,.25)' : 'rgba(30,70,20,.3)'; g.fillRect(x, y, 1, 3); hg.fillStyle = l ? '#9a9a9a' : '#606060'; hg.fillRect(x, y, 1, 3); }
   g.filter = 'blur(1px)'; g.drawImage(gc, 0, 0); g.filter = 'none';
   const gt = RC.Tex.tex(T, gc); gt.repeat.set(8, 8); const gn = RC.Tex.normalFrom(T, gh, 3); gn.repeat.set(8, 8);
@@ -54,14 +55,16 @@
     grp.position.set(x, 0, 0); scene.add(grp); spots.push({ k, x, grp });
     const tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = k.replace('_', ' '); document.body.append(tag); tags.push(tag);
   });
-  // grass clumps scattered around (the same as in the town)
-  const clump = (w, h, n) => { const parts = []; for (let i = 0; i < n; i++) { const p = new T.PlaneGeometry(w, h, 1, 3).translate(0, h / 2, 0), pp = p.attributes.position, col = new Float32Array(pp.count * 3); for (let j = 0; j < pp.count; j++) { const t = pp.getY(j) / h; pp.setZ(j, t * t * h * 0.28); col[j * 3] = col[j * 3 + 1] = col[j * 3 + 2] = 0.72 + t * 0.4; } p.rotateY((i / n) * Math.PI * 2 + 0.3); p.setAttribute('color', new T.BufferAttribute(col, 3)); const nor = p.attributes.normal; for (let j = 0; j < nor.count; j++) nor.setXYZ(j, 0, 1, 0); parts.push(p); } return T.BufferGeometryUtils.mergeGeometries(parts); };
-  const grassMat = mats.sway(new T.MeshStandardMaterial({ map: RC.Tex.leaves(T, 'grass'), alphaTest: 0.4, side: T.DoubleSide, roughness: 0.9, vertexColors: true }), 0.35, true, 0);
-  const N = 5200, gm = new T.InstancedMesh(clump(0.5, 0.3, 5), grassMat, N), m4 = new T.Matrix4(), q = new T.Quaternion(), c = new T.Color();
-  for (let i = 0; i < N; i++) { const a = Math.random() * 6.28, d = 1.5 + Math.sqrt(Math.random()) * 22, x = Math.cos(a) * d, z = Math.sin(a) * d * 0.6 + (Math.random() < 0.5 ? 3 : -3); if (Math.abs(z) < 1.4 && Math.abs(x) < 10) continue; const s = 0.7 + Math.random() * 0.6; m4.compose(new T.Vector3(x, 0, z), q.setFromAxisAngle(new T.Vector3(0, 1, 0), Math.random() * 6.28), new T.Vector3(s, s, s)); gm.setMatrixAt(i, m4); gm.setColorAt(i, c.setHSL(0.28 + Math.random() * 0.03, 0.48, 0.5 + Math.random() * 0.08)); }
-  gm.receiveShadow = true; scene.add(gm);
+  // grass: the town's covers; meadow all round with bare patches, taller and packed at the foot of each shrub
+  const shared2 = shared; shared2.uRain = { value: 0 };
+  const nearShrub = (x, z) => Math.min(...spots.map((s) => Math.hypot(x - s.x, z) - 0.55));
+  const coverPatch = (k, mask, density) => { const R = RC.Covers.RECIPES[k], m = new T.Mesh(RC.Covers.build(T, R, 26, 14, k.length, mask, { density }), RC.Covers.material(T, shared2, R.rigid)); m.receiveShadow = true; m.castShadow = true; scene.add(m); };
+  coverPatch('meadow', (x, z) => { const d = nearShrub(x, z); return d < 0.05 ? 0 : 0.75 * RC.smooth01((RC.Covers.vnoise(x + 30, z + 30, 2.4, 5) - 0.2) / 0.3); }, 0.45);
+  coverPatch('summer_tall', (x, z) => { const d = nearShrub(x, z); return d < 0.05 ? 0 : 1 - RC.smooth01((d - 0.1) / 0.9); }, 0.5);
+  coverPatch('tiny_spinifex', (x, z) => { const d = nearShrub(x, z); return d < 0 ? 0 : 1 - RC.smooth01(d / 0.5); }, 0.6);
+  coverPatch('wildflower_meadow', (x, z) => RC.smooth01((RC.Covers.vnoise(x, z, 3, 21) - 0.65) / 0.12) * (nearShrub(x, z) > 0.4 ? 1 : 0), 0.4);
   // after-effects as in the town
-  const comp = new T.EffectComposer(r); comp.addPass(new T.RenderPass(scene, cam)); const ao = new T.GTAOPass(scene, cam, 800, 600); ao.blendIntensity = 0.85; ao.updateGtaoMaterial({ radius: 0.35, distanceExponent: 1.2, thickness: 1, scale: 1, samples: 16 }); comp.addPass(ao); comp.addPass(new T.OutputPass());
+  const comp = new T.EffectComposer(r); comp.addPass(new T.RenderPass(scene, cam)); const ao = RC.aoSkipCutouts(new T.GTAOPass(scene, cam, 800, 600)); ao.blendIntensity = 0.85; ao.updateGtaoMaterial({ radius: 0.35, distanceExponent: 1.2, thickness: 1, scale: 1, samples: 16 }); comp.addPass(ao); comp.addPass(new T.OutputPass());
   // controls: an orbit around a target
   const view = { yaw: 0.5, pitch: 0.35, dist: 7, target: new T.Vector3(0, 0.4, 0) };
   let drag = null; const cv = r.domElement;

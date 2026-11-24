@@ -27,7 +27,9 @@
       // ---- camera settings: Q/E turn 90°, drag turns freely, R back to north, V the four views, wheel zooms
       if (I.hit('q')) this.yawTarget += Math.PI / 2; if (I.hit('e')) this.yawTarget -= Math.PI / 2;
       if (I.dragYaw) { this.yaw -= I.dragYaw; this.yawTarget = this.yaw; }
-      if (I.hit('r')) this.yawTarget = Math.round(this.yaw / (Math.PI * 2)) * Math.PI * 2;
+      if (I.hit('r')) { this.yawTarget = Math.round(this.yaw / (Math.PI * 2)) * Math.PI * 2; this.tilt = 0; }
+      // tilt: drag up and down, or Page Up / Page Down (down to ground level, up to looking straight down)
+      this.tilt = RC.clamp((this.tilt || 0) + I.dragTilt + (I.down('PageUp') ? -0.9 * dt : 0) + (I.down('PageDown') ? 0.9 * dt : 0), -0.62, 0.8);
       this.yaw = RC.damp(this.yaw, this.yawTarget, 8, dt);
       if (I.hit('v')) { this.viewMode = VIEW_ORDER[(VIEW_ORDER.indexOf(this.viewMode) + 1) % VIEW_ORDER.length]; this.zoom = 1; this.say('View · ' + RC.VIEWS[this.viewMode].label, 1.6); }
       if (I.wheel) this.zoom = RC.clamp(this.zoom * (1 + I.wheel * 0.12), 0.1, 3);   // close enough to look at a leaf, far enough to see the town ([ ] keys too)

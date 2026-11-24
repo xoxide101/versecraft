@@ -32,6 +32,13 @@
       this.dWater = distanceField(W, H, (c, r) => cell(c, r) === '~' || cell(c, r) === '=');
       this.dLand = distanceField(W, H, (c, r) => cell(c, r) !== '~' && cell(c, r) !== '=');
       this.solid = solid;
+      // tended ground: near buildings and road junctions in the town, fading out; never everywhere (a few spots let go)
+      const dBuild = distanceField(W, H, (c, r) => { for (const t of realm.things) if (t.kind === 'building' && c >= t.x - 1 && c < t.x + t.w + 1 && r >= t.z && r < t.z + t.d + 1) return true; return false; });
+      const dRoad = distanceField(W, H, (c, r) => cell(c, r) === '-');
+      this.dBuild = dBuild; this.dRoad = dRoad;
+      this.kept = (x, z) => (1 - RC.smooth01((this.field(dBuild, x, z) - 1.5) / 4)) * RC.smooth01((RC.fbm(x + 7, z + 3, 6, 3, 61) - 0.3) / 0.2);
+      this.worn = (x, z) => 1 - RC.smooth01((this.field(dRoad, x, z) - 0.3) / 1.6);
+      terrain.kept = this.kept; terrain.worn = this.worn;
     }
     at(x, z) { const c = Math.floor(x), r = Math.floor(z); return r < 0 || r >= this.H || c < 0 || c >= this.W ? 'T' : this.terrain.paint[r][c]; }
     // a distance field read smoothly between cell centres
@@ -39,18 +46,19 @@
       return RC.lerp(RC.lerp(g(c, r), g(c + 1, r), fx), RC.lerp(g(c, r + 1), g(c + 1, r + 1), fx), fz); }
     // each cover's share at a point in the world
     masks() {
-      const vn = RC.Covers.vnoise, grass = (k) => k === '.' || k === ',';
+      const vn = RC.Covers.vnoise, grass = (k) => k === '.' || k === ',';   // (kept / natural: this.kept)
       const free = (x, z) => !this.solid[Math.floor(z) * this.W + Math.floor(x)] && this.at(x, z) !== '-';
       const gaps = (x, z) => RC.smooth01((vn(x + 40, z + 40, 2.6, 11) - 0.22) / 0.25);   // bare earth here and there
       return {
-        meadow: (x, z) => { const k = this.at(x, z); return grass(k) && free(x, z) ? (k === '.' ? 0.8 : 0.45) * gaps(x, z) * (1 - RC.smooth01((vn(x, z, 5, 3) - 0.55) / 0.2) * 0.7) : 0; },
-        lawn: (x, z) => { const k = this.at(x, z); return k === '.' && free(x, z) ? RC.smooth01((vn(x, z, 5, 3) - 0.5) / 0.2) : 0; },
-        wildflower_meadow: (x, z) => { const k = this.at(x, z); if (!grass(k) || !free(x, z)) return 0; return k === ',' ? 0.8 : RC.smooth01((vn(x, z, 3.5, 21) - 0.68) / 0.12) * 0.8; },
-        summer_tall: (x, z) => { const k = this.at(x, z); if (!grass(k) || !free(x, z)) return 0; const d = this.field(this.dThing, x, z); return (1 - RC.smooth01((d - 0.3) / 1.6)) * 0.9; },
+        meadow: (x, z) => { const k = this.at(x, z); return grass(k) && free(x, z) ? (0.8 - this.terrain.soft(',', x, z) * 0.35) * gaps(x, z) * (1 - this.kept(x, z) * 0.8) : 0; },
+        lawn: (x, z) => { const k = this.at(x, z); return k === '.' && free(x, z) ? 0.15 + this.kept(x, z) * 0.85 : 0; },
+        summer_wild: (x, z) => { const k = this.at(x, z); return grass(k) && free(x, z) ? RC.smooth01((RC.fbm(x, z, 5, 3, 71) - 0.55) / 0.12) * (1 - this.kept(x, z)) : 0; },
+        wildflower_meadow: (x, z) => { const k = this.at(x, z); if (!grass(k) || !free(x, z)) return 0; return Math.max(this.terrain.soft(',', x, z) * 0.8, RC.smooth01((vn(x, z, 3.5, 21) - 0.68) / 0.12) * 0.8); },
+        summer_tall: (x, z) => { const k = this.at(x, z); if (!grass(k) || !free(x, z)) return 0; const d = this.field(this.dThing, x, z), untended = RC.smooth01((RC.vnoise(x, z, 3, 81) - 0.35) / 0.3) * (1 - this.kept(x, z) * 0.85); return (1 - RC.smooth01((d - 0.3) / 1.6)) * 0.95 * untended; },
         tiny_spinifex: (x, z) => { const k = this.at(x, z); if (!grass(k) || !free(x, z)) return 0; const d = this.field(this.dThing, x, z); return 1 - RC.smooth01((d - 0.2) / 0.9); },
         reed_marsh: (x, z) => { const k = this.at(x, z); if (k === '~') return 1 - RC.smooth01(this.field(this.dLand, x, z) / 1.1); if (!grass(k)) return 0; return 1 - RC.smooth01((this.field(this.dWater, x, z) - 0.4) / 1.2); },
-        forest_floor: (x, z) => (this.at(x, z) === 'T' ? 0.7 : 0),
-        forest_ferns: (x, z) => (this.at(x, z) === 'T' ? 0.45 : 0),
+        forest_floor: (x, z) => (free(x, z) ? this.terrain.soft('T', x, z) * 0.7 : 0),
+        forest_ferns: (x, z) => (free(x, z) ? this.terrain.soft('T', x, z) * 0.45 : 0),
       };
     }
     material(k) { const R = RC.Covers.RECIPES[k]; return this.mats[k] || (this.mats[k] = RC.Covers.material(this.T, this.shared, R.rigid, true)); }

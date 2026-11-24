@@ -16,7 +16,7 @@
       this.right = el('div', { class: 'right' }, el('div', { class: 'panel mapbox' }, el('div', { class: 'title' }, sim.realm.name), this.mapCv), this.viewP, this.clockP, el('div', { class: 'panel cbox' }, this.compass, this.compassText));
       this.labelBox = el('div', { class: 'labels' }); this.prompt = el('div', { class: 'prompt' }); this.toast = el('div', { class: 'toast' });
       this.dlg = el('div', { class: 'dialogue' }, this.dlgName = el('div', { class: 'name' }), this.dlgText = el('div', { class: 'text' }), el('div', { class: 'more' }, '[SPACE] CONTINUE ▼'));
-      this.help = el('div', { class: 'help' }, 'WASD move · Shift run · Space talk / use · Q E turn 90° · drag to turn · wheel or [ ] zoom · V view · R north · T +3 hours · G sky');
+      this.help = el('div', { class: 'help' }, 'WASD move · Shift run · Space talk / use · Q E turn 90° · drag to turn and tilt (PgUp PgDn) · wheel or [ ] zoom · V view · R north · T +3 hours · G sky');
       this.root.append(this.labelBox, this.card, this.right, this.prompt, this.toast, this.dlg, this.help); host.append(this.root);
       this.labelPool = []; this.mapBase = this.makeMapBase();
     }
@@ -39,7 +39,7 @@
       const look = -s.yaw; g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(pl.x * 2, pl.z * 2); g.lineTo(pl.x * 2 + Math.sin(look) * 14, pl.z * 2 - Math.cos(look) * 14); g.stroke();
       // view and clock panels
       const deg = Math.round(((((-s.yaw) * 180) / Math.PI) % 360 + 360) % 360) % 360;
-      this.viewP.innerHTML = `<b>LOOK ${dirOf(deg)} · ${RC.VIEWS[s.viewMode].label}${s.zoom !== 1 ? ' ' + Math.round(s.zoom * 100) + '%' : ''}</b><small>[Q/E] ↺90° · drag · [V] VIEW · [R] NORTH</small>`;
+      this.viewP.innerHTML = `<b>LOOK ${dirOf(deg)} · ${RC.VIEWS[s.viewMode].label}${s.zoom !== 1 ? ' ' + Math.round(s.zoom * 100) + '%' : ''}</b><small>[Q/E] ↺90° · drag turn/tilt · [V] VIEW · [R] RESET</small>`;
       this.clockP.innerHTML = `<b>${now.weekdayName.slice(0, 3).toUpperCase()} · DAY ${now.dayNumber}<span>${s.calendar.clock()}</span></b><small>${now.season.toUpperCase()} · ${now.day} ${now.monthName} · YR ${now.year}${now.market ? ' · MARKET' : ''}</small><small>${s.weather.toUpperCase()} · [T]+3H · [G] SKY</small>`;
       // compass: gold = where you look, blue = the wind
       const c = this.compass.getContext('2d'), R = 70; c.clearRect(0, 0, 180, 180); c.save(); c.translate(90, 90);
