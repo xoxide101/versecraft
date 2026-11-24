@@ -43,7 +43,10 @@
       return wet ? y * (1 - wet / 4) - 0.14 * (wet / 4) : y;
     }
     // where feet go
-    groundY(x, z) { const c = this.cell(x, z); return c === '=' ? this.pierY : c === '~' ? this.waterY : this.land(x, z); }
+    groundY(x, z) {
+      for (const d of this.decks || []) if (x >= d.x0 && x <= d.x1 && z >= d.z0 && z <= d.z1) return d.heightAt(z);   // on a pier (and its ramp)
+      const c = this.cell(x, z); return c === '=' ? this.pierY : c === '~' ? this.waterY : this.land(x, z);
+    }
 
     // ---------------------------------------------------------------- drawing: one mesh with a painted ground picture, and the water
     build(THREE) {

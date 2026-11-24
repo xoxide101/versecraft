@@ -54,17 +54,16 @@
       const flora = RC.Flora.plant(THREE, realm, terrain, shared); g.add(flora.group); tickers.push(...flora.tickers);
       const tm = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3();
 
-      // ---- piers: planks over '=' cells, posts at the corners
-      const pierCells = []; for (let r = 0; r < realm.h; r++) for (let c = 0; c < realm.w; c++) if (terrain.paint[r][c] === '=') pierCells.push([c, r]);
-      const pl = RC.Tex.real(THREE, 'planks_weathered'), plankM = pl ? M('#ffffff', { map: pl.map, normalMap: pl.normalMap, roughness: 0.9 }) : M('#9a6a3a');
-      const plank = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.1, 1), plankM, pierCells.length), post = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.07, 1.2, 6), mats.darkWood, pierCells.length);
-      pierCells.forEach(([c, r], i) => { plank.setMatrixAt(i, tm.compose(ps.set(c + 0.5, terrain.pierY - 0.05, r + 0.5), q.identity(), sc.set(0.98, 1, 0.98))); post.setMatrixAt(i, tm.compose(ps.set(c + 0.05, terrain.pierY - 0.55, r + 0.05), q, sc.set(1, 1, 1))); });
-      plank.receiveShadow = plank.castShadow = true; g.add(plank, post);
+      // ---- piers: real decks with boards, a ramp from the land, posts and braces (rc-pier.js)
+      g.add(RC.Piers.build(THREE, terrain, shared));
 
       // ---- buildings
       const surf = (k) => RC.Tex.surface(THREE, k);
-      const real = (n, fb) => { const x = RC.Tex.real(THREE, n); return x ? { map: x.map, normalMap: x.normalMap, arm: x.arm } : fb; };
-      const WT = { plaster: real('plaster', surf('plaster')), timber: surf('timber'), stone: real('stone_wall', surf('stone')), darkstone: real('castle_wall', surf('darkstone')) }, RT = surf('roof');
+      const real = (n, fb) => { const x = RC.Tex.real(THREE, n); return x ? { map: x.map, normalMap: x.normalMap, arm: x.arm, m: x.meters[0] } : Object.assign({ m: 2.4 }, fb); };
+      const WT = { plaster: real('plaster', surf('plaster')), plasterWorn: real('plaster_worn', surf('plaster')), timber: real('plaster', surf('timber')), stone: real('stone_wall', surf('stone')), darkstone: real('castle_wall', surf('darkstone')), brick: real('red_brick', surf('stone')) }, RT = Object.assign({ m: 2.2 }, surf('roof'));
+      const OAK = real('planks_oak', null), PAINT = ['#f4ecdc', '#efe0b8', '#ead2aa', '#dfe7ea', '#f2dcd2', '#e7e2c8', '#d9e4cf'];
+      const woodM = (tint, sx = 1, sy = 1) => { if (!OAK) return M(tint); const r2 = (tx) => { const c = tx.clone(); c.needsUpdate = true; c.repeat.set(sx, sy); return c; }; return M(tint, { map: r2(OAK.map), normalMap: r2(OAK.normalMap), roughness: 0.85 }); };
+      const beamM = woodM('#6b4a30', 0.3, 1), doorM = woodM('#8a5a34', 0.6, 0.9), frameM = woodM('#5a3c26', 0.4, 0.4);
       const ROOFT = { crimson: real('roof_clay', RT), terracotta: real('roof_clay', RT), cobalt: real('roof_slate', RT), emerald: real('roof_slate', RT) };
       const ROOFTINT = { crimson: '#ffffff', terracotta: '#f0b090', cobalt: '#9fb4e6', emerald: '#9fd4b0' };
 
@@ -73,26 +72,72 @@
         observatory_parlor: { wall: 'plaster', h: 2.8, roof: 1.5, tower: true }, grand_guildhall: { wall: 'stone', h: 4.0, roof: 1.9, columns: true }, l_wing_inn: { wall: 'timber', h: 3.4, roof: 1.7, wing: true },
         apothecary_conservatory: { wall: 'plaster', h: 2.6, roof: 1.5, glasshouse: true }, longhouse_tavern: { wall: 'timber', h: 2.3, roof: 2.2, barrels: true },
       };
+      const roof = (w, d, h, mat, wallMat, tex, tint) => {   // w along the ridge, d across, h tall
+        const o = new THREE.Group(), half = d / 2, ov = 0.35, run = half + ov, Ls = Math.hypot(run, h * (run / half)), ang = Math.atan2(h, half), L = w + 0.5;
+        for (const s of [-1, 1]) {
+          const m = mat.clone(); if (m.map) { m.map = mat.map.clone(); m.map.needsUpdate = true; m.map.repeat.set(L / tex.m, Ls / tex.m); } if (m.normalMap) { m.normalMap = mat.normalMap.clone(); m.normalMap.needsUpdate = true; m.normalMap.repeat.set(L / tex.m, Ls / tex.m); }
+          const slope = new THREE.Mesh(new THREE.BoxGeometry(L, 0.09, Ls), m); slope.rotation.order = 'YXZ'; slope.rotation.x = s * ang;
+          slope.position.set(0, h - (run / 2) * Math.tan(ang), s * run / 2); o.add(slope); o.userData.mats = (o.userData.mats || []).concat(m);   // (ridge down past the wall: the overhang)
+          const fas = new THREE.Mesh(new THREE.BoxGeometry(L, 0.16, 0.06), beamM); fas.position.set(0, h - run * Math.tan(ang) - 0.06, s * run); o.add(fas);   // the eave board
+        }
+        const tri = new THREE.Shape(); tri.moveTo(-half, 0); tri.lineTo(half, 0); tri.lineTo(0, h); tri.lineTo(-half, 0);
+        for (const s of [-1, 1]) { const e = new THREE.Mesh(new THREE.ShapeGeometry(tri), wallMat); e.rotation.y = s * Math.PI / 2; e.position.x = s * w / 2; o.add(e); }   // the gable ends
+        const ridge = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, L, 10, 1, false, 0, Math.PI), M(tint, { roughness: 0.7 })); ridge.rotation.z = Math.PI / 2; ridge.rotation.y = 0; ridge.position.y = h + 0.03; o.add(ridge);
+        o.traverse((x) => { if (x.isMesh) { x.castShadow = true; x.receiveShadow = true; } });
+        return o;
+      };
       const gable = (w, d, h, mat) => { const s = new THREE.Shape(); s.moveTo(-d / 2, 0); s.lineTo(d / 2, 0); s.lineTo(0, h); s.lineTo(-d / 2, 0); const ge = new THREE.ExtrudeGeometry(s, { depth: w, bevelEnabled: false }); ge.rotateY(Math.PI / 2); ge.translate(-w / 2, 0, 0); return new THREE.Mesh(ge, mat); };
       for (const b of realm.things.filter((t) => t.kind === 'building')) {
         const st = STYLE[b.style] || STYLE.one_story_cottage, grp = new THREE.Group(), fadeMats = [];
         const z0 = b.z + 0.5, z1 = b.z + b.d - 0.25, D = z1 - z0, cx = b.x + b.w / 2, cz = (z0 + z1) / 2, W = b.w - 0.3;
         const rep = (tx, x, y) => { const c = tx.clone(); c.needsUpdate = true; c.repeat.set(x, y); return c; };
-        const wt = WT[st.wall], rt = ROOFT[b.roof] || RT, realRoof = rt !== RT;
-        const wallM = M('#ffffff', { map: rep(wt.map, W / 2.6, st.h / 2.6), normalMap: rep(wt.normalMap, W / 2.6, st.h / 2.6), roughness: 0.92 });
+        // each house its own wall plan: stucco, timbered, brick, or layered (stone or brick below, timber or stucco above)
+        const soft = st.wall === 'plaster' || st.wall === 'timber', plans = ['stucco', 'timber', 'brick', 'stone_timber', 'brick_stucco', 'stone_stucco', 'timber'], plan = soft ? plans[Math.floor(RC.hash(b.x, b.z, 41) * plans.length)] : st.wall;
+        const upperKind = plan === 'brick' ? 'brick' : plan === 'stucco' || plan.endsWith('_stucco') ? 'plaster' : soft ? 'timber' : st.wall, lowerKind = plan.startsWith('stone_') ? 'stone' : plan.startsWith('brick_') ? 'brick' : null;
+        const lowH = st.h > 3.2 ? st.h * 0.5 : Math.min(1.25, st.h * 0.48);
+        const worn = RC.hash(b.x, b.z, 17) < 0.35, wt = upperKind === 'brick' ? WT.brick : (upperKind === 'plaster' || upperKind === 'timber') && worn ? WT.plasterWorn : WT[upperKind], rt = ROOFT[b.roof] || RT, realRoof = rt !== RT;
+        const paint = upperKind === 'plaster' || upperKind === 'timber' ? PAINT[Math.floor(RC.hash(b.x, b.z, 23) * PAINT.length)] : '#ffffff';
+        const wallM = M(paint, { map: rep(wt.map, W / wt.m, st.h / wt.m), normalMap: rep(wt.normalMap, W / wt.m, st.h / wt.m), roughness: 0.92 });
         if (wt.arm) { wallM.roughnessMap = rep(wt.arm, W / 2.6, st.h / 2.6); wallM.roughness = 1; }
-        const roofM = M(realRoof ? ROOFTINT[b.roof] : ROOF[b.roof] || '#b4232a', { map: rep(rt.map, W / 2.2, 1.6), normalMap: rep(rt.normalMap, W / 2.2, 1.6), roughness: 0.75 }); fadeMats.push(wallM, roofM);
+        const roofM = M(realRoof ? ROOFTINT[b.roof] : ROOF[b.roof] || '#b4232a', { map: rt.map, normalMap: rt.normalMap, roughness: 0.75 }); fadeMats.push(wallM);
         grp.add(box(W, st.h, D, wallM));
-        const rf = gable(W + 0.6, D + 0.8, st.roof, roofM); rf.position.y = st.h; grp.add(rf);
+        const ridgeTint = { crimson: '#8a3a2a', terracotta: '#b0603a', cobalt: '#3a4a6a', emerald: '#3a5a46' }[b.roof] || '#6a4a3a';
+        const rf = roof(W + 0.2, D + 0.2, st.roof, roofM, wallM, rt, ridgeTint); rf.position.y = st.h; grp.add(rf); fadeMats.push(...rf.userData.mats);
+        const stoneM = (w2, h2) => { const lt = WT.stone; return M('#ffffff', { map: rep(lt.map, w2 / lt.m, h2 / lt.m), normalMap: rep(lt.normalMap, w2 / lt.m, h2 / lt.m), roughness: 0.92 }); };
+        if (lowerKind) { const lt = WT[lowerKind], lm = M('#ffffff', { map: rep(lt.map, W / lt.m, lowH / lt.m), normalMap: rep(lt.normalMap, W / lt.m, lowH / lt.m), roughness: 0.92 }); grp.add(box(W + 0.06, lowH, D + 0.06, lm, 0, 0, 0)); fadeMats.push(lm); }   // a stone or brick ground floor
+        if (upperKind === 'plaster') { const qm = stoneM(0.4, st.h); for (const [qx, qz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) for (let y = lowerKind ? lowH : 0, k = 0; y < st.h - 0.2; y += 0.42, k++) grp.add(box(k % 2 ? 0.34 : 0.48, 0.38, k % 2 ? 0.48 : 0.34, qm, qx * (W / 2 - 0.1), y, qz * (D / 2 - 0.1))); }   // corner stones on the stucco
+        if (upperKind === 'timber') {   // half-timbering: posts, rails and braces (some single, some an X) standing proud of the stucco
+          const T2 = 0.13, faces = [[0, D / 2 + 0.03, W, 0], [0, -D / 2 - 0.03, W, 0], [W / 2 + 0.03, 0, D, Math.PI / 2], [-W / 2 - 0.03, 0, D, Math.PI / 2]];
+          for (const [fx, fz, span, rot] of faces) {
+            const f = new THREE.Group(); f.position.set(fx, 0, fz); f.rotation.y = rot; grp.add(f);
+            const n = Math.max(2, Math.round(span / 1.25)), rails = st.h > 3.2 ? [0.05, st.h * 0.5, st.h - 0.08] : [0.05, st.h - 0.08];
+            for (let i = 0; i <= n; i++) f.add(box(T2, st.h, 0.06, beamM, -span / 2 + (i / n) * span, 0, 0));
+            for (const y of rails) f.add(box(span + 0.1, T2, 0.07, beamM, 0, y - T2 / 2, 0));
+            for (let i = 0; i < n; i++) { const pick = RC.hash(i, b.x + fx, 31); if (pick > 0.6) continue; const pw = span / n, lo = Math.max(lowerKind ? lowH : 0, rails[rails.length - 2]), hi = rails[rails.length - 1], len = Math.hypot(pw, hi - lo);
+              for (const sgn of pick < 0.25 ? [1, -1] : [RC.hash(i, 3, 37) < 0.5 ? 1 : -1]) { const br = box(0.1, len, 0.05, beamM, -span / 2 + (i + 0.5) * pw, lo + (hi - lo) / 2 - len / 2, 0); br.rotation.z = sgn * Math.atan2(pw, hi - lo); f.add(br); } }
+          }
+        }
         grp.add(box(W + 0.2, 0.25, D + 0.2, mats.darkStone, 0, -0.05, 0));   // plinth
-        if (b.chimney) { const ch = box(st.bigChimney ? 1 : 0.55, st.roof + 1.2, st.bigChimney ? 1 : 0.55, mats.darkStone, W * 0.28, st.h, -D * 0.15); grp.add(ch); if (st.bigChimney) grp.add(box(0.6, 0.15, 0.6, mats.glow, W * 0.28, st.h + st.roof + 1.2, -D * 0.15)); }
+        if (b.chimney) { const cw = st.bigChimney ? 1 : 0.6, chH = st.roof + 1.2, cm = stoneM(cw, chH); grp.add(box(cw, chH, cw, cm, W * 0.28, st.h, -D * 0.15)); grp.add(box(cw + 0.16, 0.12, cw + 0.16, cm, W * 0.28, st.h + chH, -D * 0.15)); grp.add(cyl(0.1, 0.12, 0.28, M('#9a5a3a'), 8, W * 0.28, st.h + chH + 0.12, -D * 0.15)); if (st.bigChimney) grp.add(box(0.6, 0.15, 0.6, mats.glow, W * 0.28, st.h + st.roof + 1.2, -D * 0.15)); }
         // front: door and windows (glowing at night)
         const front = D / 2 + 0.01, dx = b.door ? b.door.x - cx : 0;
-        grp.add(box(1.0, 1.7, 0.12, mats.darkWood, dx, 0, front)); grp.add(box(1.3, 0.18, 0.2, mats.darkWood, dx, 1.75, front));
-        for (let i = 0; i < Math.floor(W / 2.2); i++) { const wx = -W / 2 + 1.1 + i * 2.2; if (Math.abs(wx - dx) < 1.2) continue; grp.add(box(0.8, 0.8, 0.08, mats.glass, wx, 0.9, front)); grp.add(box(0.95, 0.1, 0.14, mats.darkWood, wx, 0.85, front)); if (st.h > 3.2) grp.add(box(0.8, 0.8, 0.08, mats.glass, wx, 2.4, front)); }
+        grp.add(box(1.0, 1.75, 0.1, doorM, dx, 0, front + 0.02)); grp.add(box(1.22, 0.16, 0.18, frameM, dx, 1.75, front)); grp.add(box(0.11, 1.8, 0.16, frameM, dx - 0.56, 0, front)); grp.add(box(0.11, 1.8, 0.16, frameM, dx + 0.56, 0, front));
+        for (const sy of [0.35, 1.35]) grp.add(box(0.85, 0.06, 0.03, mats.iron, dx + 0.02, sy, front + 0.075));
+        { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 6, 14), mats.iron); ring.position.set(dx + 0.32, 0.95, front + 0.09); grp.add(ring); }
+        const shutters = st.wall === 'timber' || st.wall === 'plaster', shutM = M(['#3f5f7a', '#5a7a4a', '#7a3a2a', '#4a4a5a'][Math.floor(RC.hash(b.x, b.z, 29) * 4)]);
+        const sill = stoneM(1.1, 0.12), flowersM = [M('#d94a6a'), M('#f2c94c'), M('#ffffff'), M('#9b59d0')];
+        const win = (wx, wy) => {   // set into the wall: dark glass a little behind the face, oak frame and bars, stone sill and lintel, shutters, sometimes a flower box
+          grp.add(box(0.78, 0.8, 0.04, mats.glass, wx, wy, front - 0.06));
+          for (const [w2, h2, x2, y2] of [[0.9, 0.07, 0, -0.02], [0.9, 0.07, 0, 0.78], [0.07, 0.84, -0.42, -0.02], [0.07, 0.84, 0.42, -0.02], [0.04, 0.8, 0, 0], [0.8, 0.04, 0, 0.38]]) grp.add(box(w2, h2, 0.07, frameM, wx + x2, wy + y2, front - 0.02));
+          grp.add(box(1.05, 0.08, 0.2, sill, wx, wy - 0.1, front + 0.03)); grp.add(box(1.05, 0.14, 0.12, upperKind === 'timber' ? beamM : sill, wx, wy + 0.83, front + 0.01));
+          if (shutters) for (const s of [-1, 1]) { const sh = box(0.38, 0.84, 0.04, shutM, wx + s * 0.64, wy - 0.02, front + 0.02); grp.add(sh); for (const yy of [0.15, 0.6]) grp.add(box(0.36, 0.03, 0.05, frameM, wx + s * 0.64, wy + yy, front + 0.03)); }
+          if (RC.hash(wx * 7, wy + b.x, 51) < 0.4 && wy < 1.5) { grp.add(box(0.9, 0.16, 0.2, beamM, wx, wy - 0.24, front + 0.12)); for (let k = 0; k < 7; k++) { const fl = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 4), flowersM[(k + Math.floor(wx * 3)) % 4]); fl.position.set(wx - 0.36 + k * 0.12, wy - 0.06 + RC.hash(k, wx, 52) * 0.05, front + 0.12); grp.add(fl); } }
+        };
+        for (let i = 0; i < Math.floor(W / 2.2); i++) { const wx = -W / 2 + 1.1 + i * 2.2; if (Math.abs(wx - dx) < 1.2) continue; win(wx, 0.9); if (st.h > 3.2) win(wx, 2.4); }
         if (st.tower) { const tw = cyl(1.1, 1.1, st.h + 2.2, wallM, 14, W / 2 - 0.6, 0, -D / 2 + 0.8); grp.add(tw); const cone = new THREE.Mesh(new THREE.ConeGeometry(1.45, 1.8, 14), roofM); cone.position.set(W / 2 - 0.6, st.h + 3.1, -D / 2 + 0.8); grp.add(cone); grp.add(box(0.5, 0.5, 0.1, mats.glass, W / 2 - 0.6, st.h + 1.2, -D / 2 + 1.91)); }
-        if (st.columns) for (let i = 0; i < 4; i++) grp.add(cyl(0.22, 0.25, st.h - 0.1, M('#e8e2d4'), 10, -W / 2 + 1 + i * ((W - 2) / 3), 0, front + 0.55));
-        if (st.wing) { const wg = box(3.2, st.h - 0.8, D * 0.6, wallM, W / 2 + 1.4, 0, -D * 0.15); grp.add(wg); const wr = gable(3.6, D * 0.6 + 0.6, 1.3, roofM); wr.rotation.y = Math.PI / 2; wr.position.set(W / 2 + 1.4, st.h - 0.8, -D * 0.15); grp.add(wr); }
+        if (st.columns) { const sm = WT.darkstone.map ? M('#efe8dc', { map: rep(WT.darkstone.map, 0.6, st.h / 2.4), normalMap: rep(WT.darkstone.normalMap, 0.6, st.h / 2.4), roughness: 0.9 }) : M('#e8e2d4');
+          for (let i = 0; i < 4; i++) { const px = -W / 2 + 1 + i * ((W - 2) / 3); grp.add(box(0.62, 0.22, 0.62, sm, px, 0, front + 0.55)); grp.add(cyl(0.22, 0.26, st.h - 0.5, sm, 14, px, 0.22, front + 0.55)); grp.add(box(0.6, 0.28, 0.6, sm, px, st.h - 0.28, front + 0.55)); } }
+        if (st.wing) { const wg = box(3.2, st.h - 0.8, D * 0.6, wallM, W / 2 + 1.4, 0, -D * 0.15); grp.add(wg); const wr = roof(D * 0.6, 3.2, 1.3, roofM, wallM, rt, ridgeTint); wr.rotation.y = Math.PI / 2; wr.position.set(W / 2 + 1.4, st.h - 0.8, -D * 0.15); grp.add(wr); fadeMats.push(...wr.userData.mats); }
         if (st.glasshouse) { const gm = new THREE.MeshStandardMaterial({ color: '#bfe8d0', transparent: true, opacity: 0.45, roughness: 0.1 }); grp.add(box(2.6, 2.0, D * 0.7, gm, -W / 2 - 1.3, 0, 0)); }
         if (st.barrels) for (let i = 0; i < 3; i++) grp.add(cyl(0.3, 0.3, 0.7, M('#7a4a22'), 10, dx + 1.4 + i * 0.65, 0, front + 0.5));
         // hanging sign over the door
