@@ -71,15 +71,15 @@ for n in z['npcs']:
          'age': n.get('ageGroup') or ('child' if n.get('task') == 'play' else 'adult'), 'job': JOB.get(n.get('task'), n.get('task') or 'stand'),
          'at': {'x': n['tx'] + 0.5, 'z': n['ty'] + 0.5}, 'look': {'cloak': n['cloakColor'], 'hair': n['hairColor'], 'tunic': n['tunicColor']}, 'says': [n['greeting']]}
     if n.get('followUpGreeting'): p['says'].append(n['followUpGreeting'])
-    if n.get('walkSpeed'): p['speed'] = round(n['walkSpeed'] / 44, 2)
+    p['speed'] = round(n.get('walkSpeed') or 1.45, 2)   # (ArcadeEvo's walkSpeed is already in tiles a second; 1.45 when not set)
     if n.get('waypoints'):
         p['route'] = [{k: v for k, v in {'x': w['tx'] + 0.5, 'z': w['ty'] + 0.5, 'wait': w.get('waitSec'), 'work': w.get('performTask') or None, 'doing': w.get('activityLabel')}.items() if v is not None} for w in n['waypoints']]
     people.append(p)
 # a few more ages: an elder and an infant carried by a parent (the cast covers all ages)
 people.append({'id': 'elder_wyn', 'name': 'GRANDMOTHER WYN', 'role': 'townsfolk', 'age': 'elder', 'job': 'stroll', 'at': {'x': 44.5, 'z': 38.5}, 'look': {'cloak': '#7c6f9b', 'hair': '#e5e7eb', 'tunic': '#d6c7a1'},
-               'says': ['Sixty winters I have watched the boats come in. Each one still brings a story.'], 'speed': 0.6, 'route': [{'x': 44.5, 'z': 38.5, 'wait': 6, 'doing': 'Feeding the pigeons'}, {'x': 53.5, 'z': 38.5, 'wait': 5}, {'x': 53.5, 'z': 44.5, 'wait': 8, 'doing': 'Resting on the bench'}, {'x': 44.5, 'z': 44.5, 'wait': 4}]})
+               'says': ['Sixty winters I have watched the boats come in. Each one still brings a story.'], 'speed': 0.75, 'route': [{'x': 44.5, 'z': 38.5, 'wait': 6, 'doing': 'Feeding the pigeons'}, {'x': 53.5, 'z': 38.5, 'wait': 5}, {'x': 53.5, 'z': 44.5, 'wait': 8, 'doing': 'Resting on the bench'}, {'x': 44.5, 'z': 44.5, 'wait': 4}]})
 people.append({'id': 'mother_tess', 'name': 'TESS · WITH BABY ALBIN', 'role': 'townsfolk', 'age': 'adult', 'carries': 'infant', 'job': 'stroll', 'at': {'x': 58.5, 'z': 36.5}, 'look': {'cloak': '#be7a5c', 'hair': '#5b3a29', 'tunic': '#f1e3c8'},
-               'says': ['Shh, he finally fell asleep. The fountain always calms him.'], 'speed': 0.7, 'route': [{'x': 58.5, 'z': 36.5, 'wait': 7, 'doing': 'Rocking the baby'}, {'x': 58.5, 'z': 42.5, 'wait': 5}, {'x': 52.5, 'z': 42.5, 'wait': 6}]})
+               'says': ['Shh, he finally fell asleep. The fountain always calms him.'], 'speed': 1.0, 'route': [{'x': 58.5, 'z': 36.5, 'wait': 7, 'doing': 'Rocking the baby'}, {'x': 58.5, 'z': 42.5, 'wait': 5}, {'x': 52.5, 'z': 42.5, 'wait': 6}]})
 realm = deep({
     'id': 'wrenhaven', 'name': z['name'], 'subtitle': z.get('subtitle', ''), 'w': W, 'h': H,
     'calendar': {'hoursPerDay': 24, 'hourSeconds': 45, 'days': ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], 'marketDays': [0, 3, 6],

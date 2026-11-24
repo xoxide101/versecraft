@@ -13,7 +13,7 @@
         working: false, doing: '', mode: 'routine', modeT: 0, cool: 2 + Math.random() * 4, head: 0, hop: 0, hopV: 0, hidden: false, talking: false, home: null };
     },
     step(p, dt, w) {   // w: { time (calendar now), weather, player, doors, talkingTo }
-      const d = p.def, age = AGE[d.age] || AGE.adult, speed = (d.speed || 1.05) * (age.speed || 1);
+      const d = p.def, age = AGE[d.age] || AGE.adult, speed = (d.speed || 1.45) * (d.age === 'elder' ? 1 : 1);   // tiles a second
       const night = w.time.period === 'night' && d.job !== 'patrol', rain = (w.weather === 'rain' || w.weather === 'storm') && d.job !== 'patrol' && d.job !== 'fish';
       const pl = w.player, dpl = Math.hypot(pl.x - p.x, pl.z - p.z);
       p.talking = w.talkingTo === p;

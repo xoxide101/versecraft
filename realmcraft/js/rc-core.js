@@ -56,7 +56,7 @@
   RC.start = (sim, draw) => {
     let acc = 0, last = performance.now();
     const frame = (now) => {
-      const dt = Math.min(0.1, (now - last) / 1000); last = now; acc += dt;
+      const dt = Math.min(0.25, (now - last) / 1000); last = now; acc += dt;
       while (acc >= STEP) { sim(STEP); pressed.clear(); RC.input.dragYaw = 0; RC.input.wheel = 0; acc -= STEP; }
       draw(dt, now / 1000);
       requestAnimationFrame(frame);

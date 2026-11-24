@@ -30,7 +30,8 @@
       if (I.hit('r')) this.yawTarget = Math.round(this.yaw / (Math.PI * 2)) * Math.PI * 2;
       this.yaw = RC.damp(this.yaw, this.yawTarget, 8, dt);
       if (I.hit('v')) { this.viewMode = VIEW_ORDER[(VIEW_ORDER.indexOf(this.viewMode) + 1) % VIEW_ORDER.length]; this.zoom = 1; this.say('View · ' + RC.VIEWS[this.viewMode].label, 1.6); }
-      if (I.wheel) this.zoom = RC.clamp(this.zoom * (1 + I.wheel * 0.1), 0.45, 1.85);
+      if (I.wheel) this.zoom = RC.clamp(this.zoom * (1 + I.wheel * 0.12), 0.1, 3);   // close enough to look at a leaf, far enough to see the town ([ ] keys too)
+      if (I.hit('[')) this.zoom = RC.clamp(this.zoom * 0.8, 0.1, 3); if (I.hit(']')) this.zoom = RC.clamp(this.zoom * 1.25, 0.1, 3);
       // ---- time and weather keys: T moves time on 3 hours, G changes the sky
       if (I.hit('t')) { this.calendar.add(3); const n = this.calendar.now(); this.say(`${n.weekdayName} · ${this.calendar.clock()} (${n.period})`, 2); }
       if (I.hit('g')) { this.setWeather(WEATHER[(WEATHER.indexOf(this.weather) + 1) % WEATHER.length]); }

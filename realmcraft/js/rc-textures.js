@@ -41,9 +41,10 @@
     },
 
     // ---------------------------------------------------------------- leaf cards: many small leaves on a see-through card (white-ish, tinted per tree)
-    leaves(T, kind) {
-      if (cache['leaf' + kind]) return cache['leaf' + kind];
+    leaves(T, kind, solid) {
+      const key = 'leaf' + kind + (solid ? 'solid' : ''); if (cache[key]) return cache[key];
       const S = 256, c = cv(S, S), g = c.getContext('2d'), r = rnd(kind.length * 97 + 3);
+      if (solid) { g.fillStyle = '#7e8279'; g.fillRect(0, 0, S, S); }   // a leaf-covered core: no gaps
       const leaf = (x, y, len, wid, ang, col) => { g.save(); g.translate(x, y); g.rotate(ang); g.fillStyle = col; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(wid, len * 0.45, 0, len); g.quadraticCurveTo(-wid, len * 0.45, 0, 0); g.fill(); g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, 2); g.lineTo(0, len * 0.9); g.stroke(); g.restore(); };
       const shade = (k) => { const v = 165 + r() * 90 * k; return `rgb(${v * 0.96 | 0},${v | 0},${v * 0.9 | 0})`; };   // near-grey: each tree's colour (and season) tints it
       if (kind === 'needle') {   // pine tufts
@@ -52,7 +53,7 @@
         g.strokeStyle = shade(0.6); g.lineWidth = 3; g.beginPath(); g.moveTo(S / 2, S); g.quadraticCurveTo(S / 2 + 18, S / 2, S / 2, 6); g.stroke();
         for (let i = 0; i < 26; i++) { const t = i / 26, y = S - t * (S - 10), w = (1 - t) * 70 + 10; for (const sd of [-1, 1]) leaf(S / 2 + Math.sin(t * 2) * 10, y, w, 7, sd * (1.25 - t * 0.4), shade(1)); }
       } else if (kind === 'grass') {   // blades from the bottom
-        for (let i = 0; i < 70; i++) { const x = 8 + r() * (S - 16), h = S * (0.4 + r() * 0.6), bend = (r() - 0.5) * 70, w = 5 + r() * 4; const grd = g.createLinearGradient(0, S, 0, S - h); grd.addColorStop(0, 'rgb(150,160,140)'); grd.addColorStop(1, `rgb(${235 + r() * 20},${245 + r() * 10},${225 + r() * 20})`); g.fillStyle = grd; g.beginPath(); g.moveTo(x - w, S); g.quadraticCurveTo(x + bend * 0.4, S - h * 0.5, x + bend, S - h); g.quadraticCurveTo(x + bend * 0.4 + 2, S - h * 0.5, x + w, S); g.fill(); }
+        for (let i = 0; i < 110; i++) { const x = 8 + r() * (S - 16), h = S * (0.35 + r() * 0.65), bend = (r() - 0.5) * 80, w = 2.5 + r() * 2.5; const grd = g.createLinearGradient(0, S, 0, S - h); grd.addColorStop(0, 'rgb(205,210,195)'); grd.addColorStop(1, `rgb(${235 + r() * 20},${245 + r() * 10},${225 + r() * 20})`); g.fillStyle = grd; g.beginPath(); g.moveTo(x - w, S); g.quadraticCurveTo(x + bend * 0.4, S - h * 0.5, x + bend, S - h); g.quadraticCurveTo(x + bend * 0.4 + 2, S - h * 0.5, x + w, S); g.fill(); }
       } else if (kind === 'reed') {
         for (let i = 0; i < 24; i++) { const x = 20 + r() * (S - 40), h = S * (0.6 + r() * 0.4); g.strokeStyle = `rgb(${120 + r() * 40},${140 + r() * 40},${70 + r() * 20})`; g.lineWidth = 3; g.beginPath(); g.moveTo(x, S); g.lineTo(x + (r() - 0.5) * 20, S - h); g.stroke(); if (r() < 0.4) { g.fillStyle = '#6b4a2b'; g.fillRect(x - 3 + (r() - 0.5) * 10, S - h + 4, 6, 22); } }
       } else {   // broad leaves (oak, maple, birch, bush), some with blossoms or berries
@@ -61,8 +62,8 @@
         if (kind === 'blossom') for (let i = 0; i < 70; i++) { const x = 20 + r() * (S - 40), y = 20 + r() * (S - 40); g.fillStyle = r() < 0.5 ? '#ffd1e8' : '#ffffff'; for (let p = 0; p < 5; p++) { g.beginPath(); g.arc(x + Math.cos(p * 1.26) * 4, y + Math.sin(p * 1.26) * 4, 3.2, 0, 7); g.fill(); } g.fillStyle = '#fbbf24'; g.beginPath(); g.arc(x, y, 2, 0, 7); g.fill(); }
         if (kind === 'berry') for (let i = 0; i < 60; i++) { g.fillStyle = r() < 0.7 ? '#b3123a' : '#5b1a6b'; g.beginPath(); g.arc(20 + r() * (S - 40), 20 + r() * (S - 40), 4, 0, 7); g.fill(); }
       }
-      const t = this.tex(T, c); t.wrapS = t.wrapT = T.ClampToEdgeWrapping;
-      return (cache['leaf' + kind] = t);
+      const t = this.tex(T, c); if (!solid) t.wrapS = t.wrapT = T.ClampToEdgeWrapping;
+      return (cache[key] = t);
     },
 
     // ---------------------------------------------------------------- walls and roofs (colour + relief)

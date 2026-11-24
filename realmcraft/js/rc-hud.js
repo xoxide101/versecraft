@@ -16,7 +16,7 @@
       this.right = el('div', { class: 'right' }, el('div', { class: 'panel mapbox' }, el('div', { class: 'title' }, sim.realm.name), this.mapCv), this.viewP, this.clockP, el('div', { class: 'panel cbox' }, this.compass, this.compassText));
       this.labelBox = el('div', { class: 'labels' }); this.prompt = el('div', { class: 'prompt' }); this.toast = el('div', { class: 'toast' });
       this.dlg = el('div', { class: 'dialogue' }, this.dlgName = el('div', { class: 'name' }), this.dlgText = el('div', { class: 'text' }), el('div', { class: 'more' }, '[SPACE] CONTINUE ▼'));
-      this.help = el('div', { class: 'help' }, 'WASD move · Shift run · Space talk / use · Q E turn 90° · drag to turn · wheel zoom · V view · R north · T +3 hours · G sky');
+      this.help = el('div', { class: 'help' }, 'WASD move · Shift run · Space talk / use · Q E turn 90° · drag to turn · wheel or [ ] zoom · V view · R north · T +3 hours · G sky');
       this.root.append(this.labelBox, this.card, this.right, this.prompt, this.toast, this.dlg, this.help); host.append(this.root);
       this.labelPool = []; this.mapBase = this.makeMapBase();
     }

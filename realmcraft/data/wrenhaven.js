@@ -1348,7 +1348,8 @@
    },
    "says": [
     "Welcome to Wrenhaven! Step right through the glowing doorways of Madame Ilsa’s Parlor (NW), Corwin’s Smithery (NE), the Armory, Inn & Tavern to meet everyone inside!"
-   ]
+   ],
+   "speed": 1.45
   },
   {
    "id": "sailor",
@@ -1367,7 +1368,8 @@
    },
    "says": [
     "Stormwalls surround Vael! Check the cargo crates on the west pier—and visit Reah the Poet inside the Salted Anchor!"
-   ]
+   ],
+   "speed": 1.45
   },
   {
    "id": "water_mara",
@@ -1387,7 +1389,7 @@
    "says": [
     "The Grand Fountain’s spring water is so crisp today! I’m hauling fresh buckets back to the Harbor Inn kitchen—watch the birds splash!"
    ],
-   "speed": 0.03,
+   "speed": 1.5,
    "route": [
     {
      "x": 49.5,
@@ -1459,7 +1461,7 @@
    "says": [
     "Sweep, sweep, sweep! Autumn petals drift down from those giant oaks all day, so somebody has to keep Wrenhaven’s cobblestones tidy!"
    ],
-   "speed": 0.03,
+   "speed": 1.35,
    "route": [
     {
      "x": 45.5,
@@ -1509,7 +1511,7 @@
    "says": [
     "Whoa, cool red hair, mister! Did you see the bluebirds drinking from the fountain? Bet I can run around the square faster than you!"
    ],
-   "speed": 0.06,
+   "speed": 2.55,
    "route": [
     {
      "x": 47.5,
@@ -1559,7 +1561,7 @@
    "says": [
     "All quiet along the Upper Terrace, adventurer! Monsters have been creeping closer to the North Gate—keep your sword sharp!"
    ],
-   "speed": 0.03,
+   "speed": 1.45,
    "route": [
     {
      "x": 51.5,
@@ -1621,7 +1623,7 @@
    "says": [
     "Evening tide’s rolling in smooth! I patrol the Waterfront Quay from the cargo pier to the fishing docks."
    ],
-   "speed": 0.03,
+   "speed": 1.5,
    "route": [
     {
      "x": 23.5,
@@ -1670,7 +1672,7 @@
    "says": [
     "Oof—heavy Vaeln spice crates! Hauling cargo straight off the west pier up to the central market stalls!"
    ],
-   "speed": 0.03,
+   "speed": 1.28,
    "route": [
     {
      "x": 22.5,
@@ -1730,7 +1732,7 @@
    "says": [
     "Shh! Easy now, lad—the silver harbor bass are biting right off the east pier! Nothing more peaceful than the sea breeze."
    ],
-   "speed": 0.03,
+   "speed": 1.1,
    "route": [
     {
      "x": 80.5,
@@ -1766,7 +1768,7 @@
    "says": [
     "A little morning water keeps Wrenhaven’s wildflower beds glowing emerald bright! Have you tried rustling the blooming shrubs for hidden herbs?"
    ],
-   "speed": 0.03,
+   "speed": 1.38,
    "route": [
     {
      "x": 38.5,
@@ -1821,7 +1823,7 @@
    "says": [
     "Step inside Corwin’s Smithery right behind me if you need a sharper blade! I’m out here hammering iron wagon hoops."
    ],
-   "speed": 0.03,
+   "speed": 1.4,
    "route": [
     {
      "x": 70.5,
@@ -1856,7 +1858,7 @@
    "says": [
     "Fine silks, spices, and maps of Vael! The central square is busier than ever—stop by the Royal Armory and Guildhall while you’re in town!"
    ],
-   "speed": 0.03,
+   "speed": 1.32,
    "route": [
     {
      "x": 29.5,
@@ -1936,7 +1938,7 @@
    "says": [
     "Reading in the open sea breeze beats a dusty desk! Scholar Jeban inside the Great Library has fascinating tales of the Six Priests of the old kingdom."
    ],
-   "speed": 0.03,
+   "speed": 1.2,
    "route": [
     {
      "x": 32.5,
@@ -1984,7 +1986,7 @@
    "says": [
     "Delivering warm mugs from the Salted Anchor straight down to the harbor watch! Don’t miss Reah singing inside!"
    ],
-   "speed": 0.04,
+   "speed": 1.62,
    "route": [
     {
      "x": 33.5,
@@ -2044,7 +2046,8 @@
    "says": [
     "Fresh honey loaves straight from Wrenhaven’s Hearth Oven! Say, Rowan—if you find my missing sack of Golden Wheat Flour near the north fountain oak grove, I’ll pay 220 Gold & 600 Quest Points! Meanwhile, grab warm bread or tarts right here!",
     "My Golden Vael Wheat Flour! Now the whole town can feast on honey loaves! Take 220 Gold & +600 Quest Points, and enjoy fresh pastries anytime!"
-   ]
+   ],
+   "speed": 1.45
   },
   {
    "id": "dice_kale",
@@ -2064,7 +2067,8 @@
    "says": [
     "Pull up a bench at our Community Game Table! Folks gather here for chess, dice & warm bread. Someone dropped our lucky Ivory Crown Die in the bushes down near the central waterfront quay—find it for 180 Gold & 500 Quest Points!",
     "Ha! You found the Ivory Crown Die! The game table is roaring again! Here’s your 180 Gold winner’s purse and +500 Quest Points—spend it well at Corwin’s Smithery!"
-   ]
+   ],
+   "speed": 1.45
   },
   {
    "id": "foreman_brick",
@@ -2084,7 +2088,8 @@
    "says": [
     "Welcome to Wrenhaven’s Loom & Timber Craftworks! We mill planks, weave sails & forge crate iron for the whole harbor—except a Brass Drive Cog bounced off our wheel! Inspect the harbor cargo crates by the west pier or the craftworks yard to find it for 260 Gold & 700 Quest Points!",
     "By the Goddesses, that’s the exact Brass Drive Cog! Hear our trip-hammer and looms humming again! Take 260 Gold & +700 Quest Points for saving production!"
-   ]
+   ],
+   "speed": 1.45
   },
   {
    "id": "herder_toby",
@@ -2104,7 +2109,8 @@
    "says": [
     "Easy there, chestnuts! Our horses, sheep & dairy cows love Wrenhaven’s lush grazing pastures. One playful pony kicked my Silver Calf Bell into the berry bush behind the mid-west oak grove—bring it back for 190 Gold & 550 Quest Points!",
     "There’s my Silver Calf Bell! The herd settles right down when it chimes! Take 190 Gold & +550 Quest Points—you’ve got a sharp eye, Rowan!"
-   ]
+   ],
+   "speed": 1.45
   },
   {
    "id": "baker_helper",
@@ -2124,7 +2130,7 @@
    "says": [
     "Hot loaves from Master Orin’s brick oven straight to the community picnic tables! Smells like honey and toasted barley!"
    ],
-   "speed": 0.04,
+   "speed": 1.55,
    "route": [
     {
      "x": 38.5,
@@ -2173,7 +2179,7 @@
    "says": [
     "Timber planks, woven cloth bolts, and banded crates—everything Wrenhaven’s merchants sell starts right here at our craftworks!"
    ],
-   "speed": 0.03,
+   "speed": 1.38,
    "route": [
     {
      "x": 76.5,
@@ -2222,7 +2228,7 @@
    "says": [
     "Look, look! Yellow butterflies love the clover meadow! Grown-ups are so tall they walk right past all the wild berries and mushrooms down here!"
    ],
-   "speed": 0.04,
+   "speed": 1.95,
    "route": [
     {
      "x": 46.5,
@@ -2272,7 +2278,7 @@
    "says": [
     "Master Orin lets me ring the bread bell when honey tarts finish baking! You can cook your own berry stew at the Hearth Kettle too!"
    ],
-   "speed": 0.04,
+   "speed": 1.75,
    "route": [
     {
      "x": 41.5,
@@ -2315,7 +2321,7 @@
    "says": [
     "Hi Mr. Swordsman! My big brother Toby lets me feed orchard apples to the brown horse! Look for red apple saplings near the grass!"
    ],
-   "speed": 0.04,
+   "speed": 1.82,
    "route": [
     {
      "x": 29.5,
@@ -2358,7 +2364,7 @@
    "says": [
     "Sixty winters I have watched the boats come in. Each one still brings a story."
    ],
-   "speed": 0.6,
+   "speed": 0.75,
    "route": [
     {
      "x": 44.5,
@@ -2403,7 +2409,7 @@
    "says": [
     "Shh, he finally fell asleep. The fountain always calms him."
    ],
-   "speed": 0.7,
+   "speed": 1.0,
    "route": [
     {
      "x": 58.5,

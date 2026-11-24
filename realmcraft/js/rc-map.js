@@ -97,9 +97,50 @@
       }
 
       // ---- the smaller things
+      let LP = null;
+      const lampParts = () => LP || (LP = (() => {
+        const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 2.0, 0), new THREE.Vector3(0.3, 2.22, 0), new THREE.Vector3(0.5, 2.06, 0));
+        const halo = RC.Tex.cv(64, 64), hg = halo.getContext('2d'), gr = hg.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,214,140,1)'); gr.addColorStop(0.25, 'rgba(255,170,80,.45)'); gr.addColorStop(1, 'rgba(255,140,40,0)'); hg.fillStyle = gr; hg.fillRect(0, 0, 64, 64);
+        const flameGeo = new THREE.SphereGeometry(0.022, 10, 8); flameGeo.scale(1, 2.6, 1); flameGeo.translate(0, 0.02, 0);
+        return {
+          ring: new THREE.TorusGeometry(0.05, 0.014, 6, 14), arm: new THREE.TubeGeometry(curve, 16, 0.018, 6, false), scroll: new THREE.TorusGeometry(0.07, 0.01, 5, 14, Math.PI * 1.5),
+          cap: new THREE.ConeGeometry(0.19, 0.12, 4), pane: new THREE.PlaneGeometry(0.19, 0.28), candle: new THREE.CylinderGeometry(0.022, 0.024, 0.1, 10).translate(0, 0.05, 0),
+          flame: flameGeo, core: new THREE.SphereGeometry(0.011, 8, 6),
+          glass: new THREE.MeshStandardMaterial({ color: '#fff6e0', transparent: true, opacity: 0.22, roughness: 0.08, metalness: 0, side: THREE.DoubleSide, depthWrite: false }),
+          wax: new THREE.MeshStandardMaterial({ color: '#f1e7d2', roughness: 0.55, emissive: '#5a3a10', emissiveIntensity: 0.25 }),
+          flameMat: new THREE.MeshBasicMaterial({ color: '#ffb347', toneMapped: false }), coreMat: new THREE.MeshBasicMaterial({ color: '#fff4d6', toneMapped: false }),
+          haloMat: new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(halo), color: '#ffffff', blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 }),
+        };
+      })());
       const floraMats = RC.Flora.materials(THREE, shared);
       const make = {
-        lamp: () => { const o = new THREE.Group(); o.add(cyl(0.05, 0.07, 2.2, mats.iron, 8)); o.add(box(0.42, 0.06, 0.06, mats.iron, 0.18, 2.1, 0)); const l = box(0.22, 0.3, 0.22, mats.glow, 0.36, 1.82, 0); o.add(l); return o; },
+        lamp: (th) => {   // a cast-iron street lamp: stone plinth, fluted post with rings, a scrolled arm, a glazed lantern with a candle inside
+          const o = new THREE.Group(), L = lampParts();
+          o.add(cyl(0.17, 0.19, 0.16, mats.stone, 10)); o.add(cyl(0.1, 0.13, 0.22, mats.iron, 10, 0, 0.16));
+          o.add(cyl(0.032, 0.045, 1.85, mats.iron, 8, 0, 0.36));
+          for (const y of [0.42, 1.0, 2.12]) { const ring = new THREE.Mesh(L.ring, mats.iron); ring.position.y = y; ring.rotation.x = Math.PI / 2; o.add(ring); }
+          const top = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), mats.iron); top.position.y = 2.24; o.add(top);
+          const arm = new THREE.Mesh(L.arm, mats.iron); o.add(arm); const scroll = new THREE.Mesh(L.scroll, mats.iron); scroll.position.set(0.12, 1.98, 0); o.add(scroll);
+          const lan = new THREE.Group(); lan.position.set(0.5, 1.66, 0); o.add(lan);
+          lan.add(box(0.012, 0.16, 0.012, mats.iron, 0, 0.36, 0));   // the hook
+          const cap = new THREE.Mesh(L.cap, mats.iron); cap.position.y = 0.36; cap.rotation.y = Math.PI / 4; lan.add(cap);
+          const fin = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), mats.brass); fin.position.y = 0.48; lan.add(fin);
+          lan.add(box(0.25, 0.03, 0.25, mats.iron, 0, 0.32, 0), box(0.22, 0.035, 0.22, mats.iron, 0, 0, 0), box(0.12, 0.05, 0.12, mats.iron, 0, -0.05, 0));
+          for (const [x, z] of [[-0.11, -0.11], [0.11, -0.11], [-0.11, 0.11], [0.11, 0.11]]) lan.add(box(0.018, 0.3, 0.018, mats.iron, x, 0.02, z));
+          for (let i = 0; i < 4; i++) { const g2 = new THREE.Mesh(L.pane, L.glass); g2.position.set(Math.sin(i * Math.PI / 2) * 0.105, 0.17, Math.cos(i * Math.PI / 2) * 0.105); g2.rotation.y = i * Math.PI / 2; lan.add(g2); }
+          const dish = cyl(0.045, 0.04, 0.015, mats.brass, 10, 0, 0.035); lan.add(dish);
+          const candle = new THREE.Mesh(L.candle, L.wax); candle.position.y = 0.05; lan.add(candle);
+          const flame = new THREE.Mesh(L.flame, L.flameMat); flame.position.y = 0.165; lan.add(flame);
+          const core = new THREE.Mesh(L.core, L.coreMat); core.position.y = 0.152; lan.add(core);
+          const halo = new THREE.Sprite(L.haloMat.clone()); halo.scale.setScalar(0.9); halo.position.y = 0.17; lan.add(halo);
+          const ph = RC.hash(th.x * 10, th.z * 10, 3) * 20;
+          tickers.push((t2, s) => {
+            const on = RC.clamp((s.night - 0.15) / 0.3, 0, 1), fl = 1 + Math.sin(t2 * 13 + ph) * 0.12 + Math.sin(t2 * 23.7 + ph * 2) * 0.08;
+            flame.visible = core.visible = on > 0.02; flame.scale.set(1 + (fl - 1) * 0.4, fl, 1 + (fl - 1) * 0.4); flame.rotation.z = Math.sin(t2 * 3.1 + ph) * 0.08;
+            halo.material.opacity = on * 0.75 * (0.9 + (fl - 1) * 0.8); halo.visible = on > 0.02;
+          });
+          return o;
+        },
         fountain: () => { const o = new THREE.Group(); o.add(cyl(1.6, 1.7, 0.45, mats.white, 24)); o.add(cyl(1.35, 1.35, 0.06, new THREE.MeshStandardMaterial({ color: '#4aa3e8', roughness: 0.15 }), 24, 0, 0.36)); o.add(cyl(0.25, 0.3, 1.1, mats.white, 12)); o.add(cyl(0.75, 0.55, 0.22, mats.white, 16, 0, 1.0)); o.add(cyl(0.12, 0.15, 0.6, mats.white, 8, 0, 1.2)); return o; },
         well: () => { const o = new THREE.Group(); o.add(cyl(0.6, 0.65, 0.7, mats.stone, 14)); o.add(box(0.08, 1.4, 0.08, mats.wood, -0.55, 0.5, 0)); o.add(box(0.08, 1.4, 0.08, mats.wood, 0.55, 0.5, 0)); const r = gable(1.4, 1.1, 0.5, M('#8b4a2b')); r.position.y = 1.9; o.add(r); return o; },
         statue: () => { const o = new THREE.Group(); o.add(box(1, 0.6, 1, mats.stone)); o.add(cyl(0.22, 0.28, 1.1, M('#d9d6cf'), 8, 0, 0.6)); const h = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), M('#d9d6cf')); h.position.y = 1.95; o.add(h); return o; },
@@ -114,7 +155,7 @@
         campfire: () => { const o = new THREE.Group(); for (let i = 0; i < 4; i++) { const l = cyl(0.06, 0.06, 0.7, mats.darkWood, 6); l.rotation.z = 1.4; l.rotation.y = i * 0.8; l.position.y = 0.1; o.add(l); } const fl = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.5, 6), mats.glow); fl.position.y = 0.3; o.add(fl); return o; },
         bookshelf: () => box(1.2, 1.8, 0.4, M('#6b4226')),
         shrub: (t) => { const kind = { berry: 'berry', fern: 'fern', blossom: 'blossom', frost_bush: 'frost_bush', ember_fern: 'ember_fern' }[t.variant] || 'bush', fb = RC.Flora.bush(THREE, kind, Math.floor(t.x * 7 + t.z), 1);
-          const lm = floraMats.leafMat(fb.leaf, 0.06), o = new THREE.Group(), m = new THREE.Mesh(fb.leaves, lm); m.customDepthMaterial = lm.userData.depth; o.add(m);
+          const tint0 = new THREE.Color(fb.color), lm = floraMats.leafMat(fb.leaf, 0.06), o = new THREE.Group(), m = new THREE.Mesh(fb.leaves, lm); m.customDepthMaterial = lm.userData.depth; o.add(m); if (fb.fill) { const fm = new THREE.Mesh(fb.fill, floraMats.fillMat(fb.leaf)); fm.castShadow = true; o.add(fm); const fc = fb.fill.attributes.color; for (let i = 0; i < fc.count; i++) fc.setXYZ(i, fc.getX(i) * tint0.r, fc.getY(i) * tint0.g, fc.getZ(i) * tint0.b); }
           const tint = new THREE.Color(fb.color), c = fb.leaves.attributes.color; for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) * tint.r, c.getY(i) * tint.g, c.getZ(i) * tint.b); o.scale.setScalar(1.15); return o; },
         chest: () => { const o = new THREE.Group(); o.add(box(0.7, 0.4, 0.45, M('#8b5a2b'))); const lid = box(0.72, 0.16, 0.47, M('#6b4226'), 0, 0.4, 0); lid.name = 'lid'; o.add(lid); o.add(box(0.12, 0.14, 0.05, mats.brass, 0, 0.32, 0.24)); return o; },
         forage: (t) => { const o = new THREE.Group(); const n = t.node;
@@ -139,7 +180,7 @@
         if (t.kind === 'station') label(t.title, t.x, Y(t.x, t.z) + 1.9, t.z, 'station');
       }
       // lamps light the street at night: a few real lights, moved to the lamps nearest the camera
-      const lampSpots = realm.things.filter((t) => t.kind === 'lamp').map((t) => ({ x: t.x + 0.36, y: Y(t.x, t.z) + 1.75, z: t.z }));
+      const lampSpots = realm.things.filter((t) => t.kind === 'lamp').map((t) => ({ x: t.x + 0.5, y: Y(t.x, t.z) + 1.85, z: t.z }));
       const pool = [0, 1, 2, 3, 4, 5].map(() => { const l = new THREE.PointLight('#ffb35c', 0, 9, 1.6); g.add(l); return l; });
       tickers.push((t2, s) => { if (!s.cam) return; const near = lampSpots.map((p) => [p, (p.x - s.cam.x) ** 2 + (p.z - s.cam.z) ** 2]).sort((a, b) => a[1] - b[1]); pool.forEach((l, i) => { const p = near[i] && near[i][0]; if (!p) { l.intensity = 0; return; } l.position.set(p.x, p.y, p.z); l.intensity = s.night * 6 * (0.92 + Math.sin(t2 * 7 + i) * 0.08); }); });
       return { group: g, labels, tickers, buildings, mats };

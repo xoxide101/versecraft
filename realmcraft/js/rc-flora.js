@@ -12,8 +12,8 @@
     pine: { bark: 'pine', leaf: 'needle', h: [3.6, 4.8], trunks: [1], conifer: true, seasons: ['#3f6f45', '#355f3b', '#365c3a', '#2f513a'] },
   };
   const BUSHES = {
-    bush: { leaf: 'oak', r: 0.55, cards: 14, color: '#4c8a36' }, berry: { leaf: 'berry', r: 0.5, cards: 12, color: '#3f7d32' }, blossom: { leaf: 'blossom', r: 0.55, cards: 14, color: '#5a9a45' },
-    frost_bush: { leaf: 'birch', r: 0.5, cards: 12, color: '#86b5aa' }, fern: { fern: true, color: '#4f9a35' }, ember_fern: { fern: true, color: '#9a5a2a' }, sapling: { leaf: 'birch', r: 0.35, cards: 7, color: '#7fbe4a', stem: 0.8 },
+    bush: { leaf: 'oak', r: 0.55, cards: 14, size: 0.42, color: '#4c8a36' }, berry: { leaf: 'berry', r: 0.5, cards: 13, size: 0.4, color: '#3f7d32' }, blossom: { leaf: 'blossom', r: 0.55, cards: 14, size: 0.44, color: '#5a9a45' },
+    frost_bush: { leaf: 'birch', r: 0.5, cards: 13, size: 0.36, color: '#86b5aa' }, box: { leaf: 'birch', r: 0.42, cards: 16, size: 0.3, color: '#3d7a3a' }, fern: { fern: true, color: '#4f9a35' }, ember_fern: { fern: true, color: '#9a5a2a' }, sapling: { leaf: 'birch', r: 0.35, cards: 7, color: '#7fbe4a', stem: 0.8 },
   };
   RC.Flora = { SPECIES, BUSHES };
   const V3 = (x, y, z) => ({ x, y, z });
@@ -26,25 +26,43 @@
     const uv = ge.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setY(i, uv.getY(i) * len * 0.8);
     return ge;
   }
-  // a cluster of leaf cards around a point; normals point outward from the canopy middle (rounded light)
-  function cluster(T, c, rad, n, size, mid, r, out, tint) {
+  // a lumpy rounded shell (the filled core of a leaf mass): normals from the crown's middle, so the whole crown shades as one round form
+  function blob(T, c, rad, mid, r, out, squash = 0.8, shade = 0.62) {
+    const ge = new T.IcosahedronGeometry(rad, 1), pos = ge.attributes.position, s = r() * 100;
+    for (let j = 0; j < pos.count; j++) { const x = pos.getX(j), y = pos.getY(j), z = pos.getZ(j), n = 0.8 + RC.hash(Math.round(x * 13 + s), Math.round(y * 13), Math.round(z * 13)) * 0.4; pos.setXYZ(j, c.x + x * n, c.y + y * n * squash, c.z + z * n); }
+    const nor = ge.attributes.normal, uv = ge.attributes.uv, col = new Float32Array(pos.count * 3);
+    for (let j = 0; j < pos.count; j++) {
+      const lx = pos.getX(j) - c.x, ly = pos.getY(j) - c.y, lz = pos.getZ(j) - c.z, gx = pos.getX(j) - mid.x, gy = pos.getY(j) - mid.y + 0.3, gz = pos.getZ(j) - mid.z;
+      const nx = gx + lx * 0.8, ny = gy + ly * 0.8, nz = gz + lz * 0.8, l = Math.hypot(nx, ny, nz) || 1; nor.setXYZ(j, nx / l, ny / l, nz / l);
+      uv.setXY(j, (Math.atan2(lz, lx) / 6.28 + 0.5) * 3, (ly / rad * 0.5 + 0.5) * 2);
+      const k = shade * (0.85 + RC.clamp(ny / l, -0.3, 1) * 0.2); col[j * 3] = col[j * 3 + 1] = col[j * 3 + 2] = k;
+    }
+    ge.setAttribute('color', new T.BufferAttribute(col, 3)); out.push(ge.toNonIndexed ? ge.index ? ge.toNonIndexed() : ge : ge);
+  }
+  // leaf cards around a point: gently curved, mostly facing out from the crown (a round silhouette), the rest at random
+  function cluster(T, c, rad, n, size, mid, r, out, tint, fill) {
+    if (fill) blob(T, c, rad * 0.95, mid, r, fill);
+    const Z = new T.Vector3(0, 0, 1);
     for (let i = 0; i < n; i++) {
-      const p = new T.PlaneGeometry(size, size);
-      p.applyQuaternion(new T.Quaternion().setFromEuler(new T.Euler(r() * 6.28, r() * 6.28, r() * 6.28)));
-      const ox = (r() - 0.5) * 2 * rad, oy = (r() - 0.5) * 1.4 * rad, oz = (r() - 0.5) * 2 * rad; p.translate(c.x + ox, c.y + oy, c.z + oz);
-      const pos = p.attributes.position, nor = p.attributes.normal, col = new Float32Array(pos.count * 3), k = 0.82 + r() * 0.3 * tint;
+      const p = new T.PlaneGeometry(size, size, 2, 2), pp = p.attributes.position;
+      for (let j = 0; j < pp.count; j++) { const x = pp.getX(j), y = pp.getY(j); pp.setZ(j, -((x * x + y * y) / (size * size)) * size * 0.45); }   // cupped
+      const ox = (r() - 0.5) * 2 * rad, oy = (r() - 0.5) * 1.4 * rad, oz = (r() - 0.5) * 2 * rad, at = new T.Vector3(c.x + ox, c.y + oy, c.z + oz);
+      const out1 = at.clone().sub(new T.Vector3(mid.x, mid.y - 0.3, mid.z)).normalize().add(new T.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).multiplyScalar(i % 3 === 0 ? 2.4 : 0.7)).normalize();
+      p.applyQuaternion(new T.Quaternion().setFromAxisAngle(Z, r() * 6.28)); p.applyQuaternion(new T.Quaternion().setFromUnitVectors(Z, out1));
+      p.translate(at.x + out1.x * rad * 0.35, at.y + out1.y * rad * 0.35, at.z + out1.z * rad * 0.35);
+      const pos = p.attributes.position, nor = p.attributes.normal, col = new Float32Array(pos.count * 3), k = 0.86 + r() * 0.26 * tint;
       for (let j = 0; j < pos.count; j++) {
         const nx = pos.getX(j) - mid.x + (pos.getX(j) - c.x) * 0.6, ny = (pos.getY(j) - mid.y) * 0.8 + (pos.getY(j) - c.y) * 0.6 + 0.25, nz = pos.getZ(j) - mid.z + (pos.getZ(j) - c.z) * 0.6, l = Math.hypot(nx, ny, nz) || 1;
         nor.setXYZ(j, nx / l, ny / l, nz / l);
-        const inner = RC.clamp(Math.hypot(pos.getX(j) - mid.x, pos.getZ(j) - mid.z) / 2, 0.72, 1);   // darker inside the crown
+        const inner = RC.clamp(Math.hypot(pos.getX(j) - mid.x, pos.getZ(j) - mid.z) / 2, 0.74, 1);   // darker inside the crown
         col[j * 3] = col[j * 3 + 1] = col[j * 3 + 2] = k * inner;
       }
-      p.setAttribute('color', new T.BufferAttribute(col, 3)); out.push(p);
+      p.setAttribute('color', new T.BufferAttribute(col, 3)); out.push(p.index ? p.toNonIndexed() : p);
     }
   }
 
   RC.Flora.tree = function (T, kind, seed, detail = 1) {
-    const sp = SPECIES[kind], r = RC.rng(seed * 7919 + kind.length), bark = [], leaves = [];
+    const sp = SPECIES[kind], r = RC.rng(seed * 7919 + kind.length), bark = [], leaves = [], fill = [];
     const pick = (a) => a[Math.floor(r() * a.length)], range = (a) => a[0] + r() * (a[1] - a[0]);
     const H = range(sp.h);
     if (sp.conifer) {   // straight trunk, tiers of needle cards, short branches
@@ -59,6 +77,9 @@
           p.setAttribute('color', new T.BufferAttribute(col, 3)); leaves.push(p);
           if (j % 2 === 0 && t < 0.8) bark.push(limb(T, V3(0, y - 0.1, 0), V3(Math.sin(a) * rad * 0.8, y - 0.25, Math.cos(a) * rad * 0.8), 0.035, 0.012, 4));
         }
+        const cone = new T.ConeGeometry(rad * 0.82, (H - 0.6) / tiers * 2.4, 10, 2, true), cp = cone.attributes.position, cn = cone.attributes.normal, cc = new Float32Array(cp.count * 3);
+        for (let q = 0; q < cp.count; q++) { const x = cp.getX(q), z = cp.getZ(q), w = 0.85 + RC.hash(q, i, seed) * 0.3; cp.setXYZ(q, x * w, cp.getY(q) + y + 0.1, z * w); const l = Math.hypot(x, 0.6, z) || 1; cn.setXYZ(q, x / l, 0.6 / l, z / l); cc[q * 3] = cc[q * 3 + 1] = cc[q * 3 + 2] = 0.6 + t * 0.2; }
+        cone.setAttribute('color', new T.BufferAttribute(cc, 3)); fill.push(cone.index ? cone.toNonIndexed() : cone);
       }
     } else {
       const trunks = pick(sp.trunks), mid = V3(0, H + (sp.slim ? 0.2 : 0.6), 0);
@@ -74,25 +95,45 @@
           const t = 0.45 + r() * 0.55, from = pts[1 + Math.min(2, Math.floor(t * 3))], a = r() * 6.28, len = sp.spread * (0.6 + r() * 0.6) * (sp.slim ? 0.8 : 1);
           const elbow = V3(from.x + Math.cos(a) * len * 0.55, from.y + len * (sp.slim ? 0.55 : 0.3), from.z + Math.sin(a) * len * 0.55), tip = V3(from.x + Math.cos(a) * len, from.y + len * (sp.slim ? 0.85 : 0.55) + (r() - 0.3) * 0.3, from.z + Math.sin(a) * len);
           bark.push(limb(T, from, elbow, r0 * 0.45, r0 * 0.3, 5), limb(T, elbow, tip, r0 * 0.3, r0 * 0.12, 5));
-          cluster(T, tip, sp.round ? 0.55 : 0.48, Math.round(sp.clusters / nb * 2.2 * detail), sp.card, mid, r, leaves, 1);
-          cluster(T, elbow, 0.38, Math.round(3 * detail), sp.card * 0.9, mid, r, leaves, 1);
+          cluster(T, tip, sp.round ? 0.55 : 0.48, Math.round(sp.clusters / nb * 2.2 * detail), sp.card, mid, r, leaves, 1, fill);
+          cluster(T, elbow, 0.38, Math.round(3 * detail), sp.card * 0.9, mid, r, leaves, 1, fill);
         }
-        cluster(T, V3(prev.x, prev.y + 0.25, prev.z), sp.round ? 0.75 : 0.55, Math.round(sp.clusters * 0.6 * detail), sp.card * 1.05, mid, r, leaves, 1);   // the crown top
+        cluster(T, V3(prev.x, prev.y + 0.25, prev.z), sp.round ? 0.75 : 0.55, Math.round(sp.clusters * 0.6 * detail), sp.card * 1.05, mid, r, leaves, 1, fill);   // the crown top
       }
     }
-    return { bark: T.BufferGeometryUtils.mergeGeometries(bark), leaves: T.BufferGeometryUtils.mergeGeometries(leaves) };
+    const M = (a) => T.BufferGeometryUtils.mergeGeometries(a.map((g) => (g.index ? g.toNonIndexed() : g)));
+    return { bark: M(bark), leaves: M(leaves), fill: fill.length ? M(fill) : null };
   };
   RC.Flora.bush = function (T, kind, seed, detail = 1) {
-    const b = BUSHES[kind] || BUSHES.bush, r = RC.rng(seed * 131 + kind.length), out = [], stems = [];
+    const b = BUSHES[kind] || BUSHES.bush, r = RC.rng(seed * 131 + kind.length), out = [], stems = [], fill = [];
     if (b.fern) {   // fronds arching out from the middle
       const n = Math.round((9 + r() * 5) * Math.max(0.6, detail));
       for (let i = 0; i < n; i++) { const p = new T.PlaneGeometry(0.42, 0.95); p.translate(0, 0.47, 0); p.rotateX(0.55 + r() * 0.5); p.rotateY((i / n) * 6.28 + r() * 0.4); const pos = p.attributes.position, nor = p.attributes.normal, col = new Float32Array(pos.count * 3), k = 0.8 + r() * 0.3; for (let j = 0; j < pos.count; j++) { const l = Math.hypot(pos.getX(j), 1, pos.getZ(j)); nor.setXYZ(j, pos.getX(j) / l, 1 / l, pos.getZ(j) / l); col[j * 3] = col[j * 3 + 1] = col[j * 3 + 2] = k; } p.setAttribute('color', new T.BufferAttribute(col, 3)); out.push(p); }
       return { leaves: T.BufferGeometryUtils.mergeGeometries(out), leaf: 'fern', color: b.color };
     }
-    const mid = V3(0, b.r * 0.9 + (b.stem || 0), 0);
-    if (b.stem) stems.push(limb(T, V3(0, -0.05, 0), V3(0, b.stem + 0.2, 0), 0.04, 0.02, 5));
-    for (let i = 0; i < 4; i++) cluster(T, V3((r() - 0.5) * b.r, b.r * 0.75 + (b.stem || 0) + r() * 0.2, (r() - 0.5) * b.r), b.r * 0.7, Math.round(b.cards / 4 * Math.max(0.6, detail)), 0.62, mid, r, out, 1);
-    return { leaves: T.BufferGeometryUtils.mergeGeometries(out), bark: stems.length ? T.BufferGeometryUtils.mergeGeometries(stems) : null, leaf: b.leaf, color: b.color };
+    const R0 = b.r, st = b.stem || 0, mid = V3(0, R0 * 0.78 + st, 0), Z = new T.Vector3(0, 0, 1);
+    if (st) stems.push(limb(T, V3(0, -0.05, 0), V3(0, st + 0.2, 0), 0.04, 0.02, 5));
+    blob(T, V3(mid.x, mid.y - R0 * 0.08, mid.z), R0 * 0.74, mid, r, fill, 0.72, 0.5);   // the dark core: no see-through gaps, gives depth between leaves
+    const n = Math.round(b.cards * 3.4 * Math.max(0.6, detail)), size = b.size || 0.42;
+    for (let i = 0; i < n; i++) {
+      // spread evenly over the dome (a golden-angle spiral from the top down to just below the middle)
+      const t = (i + 0.5) / n, y = 1 - t * 1.32, ring = Math.sqrt(Math.max(0, 1 - y * y)) * (y < 0 ? 1 + y * 0.6 : 1), phi = i * 2.39996 + r() * 0.3;
+      const dir = new T.Vector3(Math.cos(phi) * ring, y, Math.sin(phi) * ring), lump = 0.86 + r() * 0.26;
+      const at = new T.Vector3(mid.x + dir.x * R0 * lump, mid.y + dir.y * R0 * 0.82 * lump, mid.z + dir.z * R0 * lump);
+      const p = new T.PlaneGeometry(size, size, 2, 2), pp = p.attributes.position;
+      for (let j = 0; j < pp.count; j++) { const x = pp.getX(j), yy = pp.getY(j); pp.setZ(j, -((x * x + yy * yy) / (size * size)) * size * 0.5); }
+      const face = dir.clone().setY(Math.max(dir.y, 0.15)).add(new T.Vector3(r() - 0.5, r() - 0.2, r() - 0.5).multiplyScalar(0.9)).normalize();
+      p.applyQuaternion(new T.Quaternion().setFromAxisAngle(Z, r() * 6.28)); p.applyQuaternion(new T.Quaternion().setFromUnitVectors(Z, face)); p.translate(at.x, at.y, at.z);
+      const pos = p.attributes.position, nor = p.attributes.normal, col = new Float32Array(pos.count * 3);
+      for (let j = 0; j < pos.count; j++) {
+        const nx = pos.getX(j) - mid.x, ny = (pos.getY(j) - mid.y) * 1.2 + 0.15, nz = pos.getZ(j) - mid.z, l = Math.hypot(nx, ny, nz) || 1; nor.setXYZ(j, nx / l, ny / l, nz / l);
+        const k = (0.6 + 0.4 * RC.clamp(ny / l + 0.2, 0, 1)) * (0.9 + r() * 0.2);   // lighter on top, darker underneath
+        col[j * 3] = col[j * 3 + 1] = col[j * 3 + 2] = k;
+      }
+      p.setAttribute('color', new T.BufferAttribute(col, 3)); out.push(p.index ? p.toNonIndexed() : p);
+    }
+    const M = (a) => T.BufferGeometryUtils.mergeGeometries(a.map((g) => (g.index ? g.toNonIndexed() : g)));
+    return { leaves: M(out), fill: fill.length ? M(fill) : null, bark: stems.length ? M(stems) : null, leaf: b.leaf, color: b.color };
   };
   RC.Flora.rock = function (T, seed) {
     const r = RC.rng(seed * 61 + 5), ge = new T.IcosahedronGeometry(0.5, 2), p = ge.attributes.position;
@@ -105,14 +146,10 @@
 
   // ---------------------------------------------------------------- materials (shared, swaying)
   RC.Flora.materials = function (T, shared) {
-    const sway = (mat, strength) => {
-      mat.onBeforeCompile = (sh) => { sh.uniforms.uTime = shared.uTime; sh.uniforms.uWind = shared.uWind; sh.uniforms.uCam = shared.uCam; sh.uniforms.uPlayer = shared.uPlayer;
-        // walk-behind: leaves between the camera and the player dissolve (a dither, so it stays soft)
-        sh.fragmentShader = 'uniform vec3 uCam; uniform vec3 uPlayer; varying vec3 vFadeW;\n' + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
-          vec3 ab = uPlayer - uCam; float tt = clamp(dot(vFadeW - uCam, ab) / max(dot(ab, ab), 0.001), 0.0, 1.0);
-          float dd = length(vFadeW - (uCam + ab * tt));
-          if (tt < 0.96 && dd < 2.6) { float nz = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453); if (nz > (dd - 1.4) / 1.2) discard; }`);
-        sh.vertexShader = 'uniform float uTime; uniform vec3 uWind; varying vec3 vFadeW;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    // wind: whole plants lean and sway with height; leaves also flutter (bark never moves)
+    const sway = (mat, strength, flutter = true) => {
+      mat.onBeforeCompile = (sh) => { sh.uniforms.uTime = shared.uTime; sh.uniforms.uWind = shared.uWind;
+        sh.vertexShader = 'uniform float uTime; uniform vec3 uWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
           #ifdef USE_INSTANCING
           vec2 ip = instanceMatrix[3].xz;
           #else
@@ -120,20 +157,16 @@
           #endif
           float hgt = max(position.y - 0.4, 0.0);
           float sw = hgt * ${strength.toFixed(3)} * (0.5 + uWind.z);
-          float flutter = sin(uTime * 7.0 + position.x * 9.0 + position.z * 7.0 + ip.x) * 0.012 * (0.4 + uWind.z);
+          float flutter = ${flutter ? '1.0' : '0.0'} * sin(uTime * 7.0 + position.x * 9.0 + position.z * 7.0 + ip.x) * 0.012 * (0.4 + uWind.z);
           transformed.x += (sin(uTime * 1.4 + ip.x * 0.7 + ip.y * 0.3) * 0.5 + uWind.x * 0.7) * sw + flutter;
           transformed.z += (cos(uTime * 1.1 + ip.y * 0.6) * 0.35 + uWind.y * 0.7) * sw + flutter;
-          transformed.y += flutter * 0.6;
-          #ifdef USE_INSTANCING
-          vFadeW = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
-          #else
-          vFadeW = (modelMatrix * vec4(transformed, 1.0)).xyz;
-          #endif`); };
-      mat.customProgramCacheKey = () => 'sway' + strength; return mat;
+          transformed.y += flutter * 0.6;`); };
+      mat.customProgramCacheKey = () => 'sway' + strength + flutter; return mat;
     };
     const leafMat = (kind, strength) => { const map = RC.Tex.leaves(T, kind); const m = sway(new T.MeshStandardMaterial({ map, alphaTest: 0.42, side: T.DoubleSide, vertexColors: true, roughness: 0.72, metalness: 0 }), strength); m.userData.depth = new T.MeshDepthMaterial({ map, alphaTest: 0.42, depthPacking: T.RGBADepthPacking }); return m; };
-    const barkMat = (kind) => { const b = RC.Tex.bark(T, kind); const m = sway(new T.MeshStandardMaterial({ map: b.map, normalMap: b.normalMap, roughness: 0.95 }), 0.004); m.map.repeat.set(2, 1); m.normalMap.repeat.set(2, 1); return m; };   // (barely sways; shares the walk-behind)
-    return { leafMat, barkMat, sway };
+    const barkMat = (kind) => { const b = RC.Tex.bark(T, kind); const m = new T.MeshStandardMaterial({ map: b.map, normalMap: b.normalMap, roughness: 0.95 }); m.map.repeat.set(2, 1); m.normalMap.repeat.set(2, 1); return m; };
+    const fillMat = (kind, strength = 0.04) => { const map = RC.Tex.leaves(T, kind, true); return sway(new T.MeshStandardMaterial({ map, vertexColors: true, roughness: 0.85 }), strength, false); };
+    return { leafMat, barkMat, fillMat, sway };
   };
 
   // ---------------------------------------------------------------- planting a realm: forest cells, edges, meadows, waterside
@@ -154,13 +187,14 @@
     for (const [kind, list] of Object.entries(trees)) {
       if (!list.length) continue;
       const sp = SPECIES[kind], variants = [0, 1, 2].map((v) => RC.Flora.tree(T, kind, v + 1, detail));
-      const barkM = mats.barkMat(sp.bark), leafM = mats.leafMat(sp.leaf, sp.conifer ? 0.03 : 0.05);
+      const barkM = mats.barkMat(sp.bark), leafM = mats.leafMat(sp.leaf, sp.conifer ? 0.03 : 0.05), fillM = mats.fillMat(sp.leaf);
       variants.forEach((vg, vi) => {
         const mine = list.filter((t) => Math.floor(t[2] * 3) === vi); if (!mine.length) return;
-        const bm = new T.InstancedMesh(vg.bark, barkM, mine.length), lm = new T.InstancedMesh(vg.leaves, leafM, mine.length);
+        const bm = new T.InstancedMesh(vg.bark, barkM, mine.length), lm = new T.InstancedMesh(vg.leaves, leafM, mine.length), fm = vg.fill ? new T.InstancedMesh(vg.fill, fillM, mine.length) : null;
+        if (fm) { fm.castShadow = fm.receiveShadow = true; }
         lm.customDepthMaterial = leafM.userData.depth; bm.castShadow = lm.castShadow = true; bm.receiveShadow = lm.receiveShadow = true;
-        mine.forEach(([x, z, h], i) => { const s = 0.8 + RC.hash(i, vi, 9) * 0.45; tm.compose(ps.set(x, Y(x, z), z), qu.setFromAxisAngle(up, h * 40), sc.set(s, s * (0.92 + RC.hash(vi, i, 3) * 0.2), s)); bm.setMatrixAt(i, tm); lm.setMatrixAt(i, tm); lm.setColorAt(i, col.set('#ffffff')); });
-        g.add(bm, lm); seasonal.push({ mesh: lm, sp, count: mine.length });
+        mine.forEach(([x, z, h], i) => { const s = 0.8 + RC.hash(i, vi, 9) * 0.45; tm.compose(ps.set(x, Y(x, z), z), qu.setFromAxisAngle(up, h * 40), sc.set(s, s * (0.92 + RC.hash(vi, i, 3) * 0.2), s)); bm.setMatrixAt(i, tm); lm.setMatrixAt(i, tm); lm.setColorAt(i, col.set('#ffffff')); if (fm) { fm.setMatrixAt(i, tm); fm.setColorAt(i, col); } });
+        g.add(bm, lm); seasonal.push({ mesh: lm, sp, count: mine.length }); if (fm) { g.add(fm); seasonal.push({ mesh: fm, sp, count: mine.length }); }
       });
     }
     // brush: forest edges, meadow scatter, reeds by the water, rocks
@@ -172,19 +206,20 @@
       if (wet && h < 0.55) brush.reed.push([x, z, h]);
       else if (edge && h < 0.6) brush[h < 0.22 ? 'fern' : h < 0.36 ? 'bush' : h < 0.44 ? 'sapling' : h < 0.52 ? 'berry' : 'rock'].push([x, z, h2]);
       else if (k === '.' && h < 0.075) brush[h < 0.025 ? 'bush' : h < 0.045 ? 'fern' : h < 0.06 ? 'rock' : 'blossom'].push([x, z, h2]);
-      if (h2 < 0.5 * q.grass * (k === ',' ? 0.6 : 1) && !wet) brush.grass.push([c + RC.hash(c, r, 94), r + RC.hash(c, r, 95), h]);
-      if (h2 < 0.3 * q.grass && k === '.') brush.grass.push([c + RC.hash(c, r, 96), r + RC.hash(c, r, 97), h2]);
+      if (!wet) for (let i = 0; i < Math.round((k === ',' ? 1.2 : 2.4) * q.grass + RC.hash(c, r, 98)); i++) brush.grass.push([c + RC.hash(c * 5 + i, r, 94), r + RC.hash(c, r * 5 + i, 95), RC.hash(c + i, r, 99)]);
     }
     const plantSet = (list, geo, mat, scale, tint, castShadow = true) => {
       if (!list.length) return null; const m = new T.InstancedMesh(geo, mat, list.length); if (mat.userData.depth) m.customDepthMaterial = mat.userData.depth;
       list.forEach(([x, z, h], i) => { const s = scale[0] + h * (scale[1] - scale[0]); m.setMatrixAt(i, tm.compose(ps.set(x, Y(x, z), z), qu.setFromAxisAngle(up, h * 50), sc.set(s, s, s))); if (tint) m.setColorAt(i, col.set(tint).offsetHSL((h - 0.5) * 0.04, 0, (h - 0.5) * 0.12)); });
       m.castShadow = castShadow; m.receiveShadow = true; g.add(m); return m;
     };
-    for (const kind of ['bush', 'berry', 'blossom', 'fern', 'sapling']) { const b = RC.Flora.bush(T, kind, 3, detail); plantSet(brush[kind], b.leaves, mats.leafMat(b.leaf, kind === 'fern' ? 0.12 : 0.06), [0.75, 1.25], b.color); if (b.bark) plantSet(brush[kind], b.bark, mats.barkMat('birch'), [0.75, 1.25]); }
+    for (const kind of ['bush', 'berry', 'blossom', 'fern', 'sapling']) { const b = RC.Flora.bush(T, kind, 3, detail); plantSet(brush[kind], b.leaves, mats.leafMat(b.leaf, kind === 'fern' ? 0.12 : 0.06), [0.75, 1.25], b.color); if (b.fill) plantSet(brush[kind], b.fill, mats.fillMat(b.leaf), [0.75, 1.25], b.color); if (b.bark) plantSet(brush[kind], b.bark, mats.barkMat('birch'), [0.75, 1.25]); }
     // reeds and grass: crossed cards
+    const clump = (w, h, n) => { const parts = []; for (let i = 0; i < n; i++) { const p = new T.PlaneGeometry(w, h, 1, 3).translate(0, h / 2, 0), pp = p.attributes.position, col = new Float32Array(pp.count * 3); for (let j = 0; j < pp.count; j++) { const t = pp.getY(j) / h; pp.setZ(j, t * t * h * 0.28); col[j * 3] = col[j * 3 + 1] = col[j * 3 + 2] = 0.72 + t * 0.4; } p.rotateY((i / n) * Math.PI * 2 + 0.3); p.setAttribute('color', new T.BufferAttribute(col, 3)); const nor = p.attributes.normal; for (let j = 0; j < nor.count; j++) nor.setXYZ(j, 0, 1, 0); parts.push(p); } return T.BufferGeometryUtils.mergeGeometries(parts); };
     const crossed = (w, h, n) => { const parts = []; for (let i = 0; i < n; i++) { const p = new T.PlaneGeometry(w, h).translate(0, h / 2, 0); p.rotateY((i / n) * Math.PI); const nor = p.attributes.normal; for (let j = 0; j < nor.count; j++) nor.setXYZ(j, 0, 1, 0); parts.push(p); } return T.BufferGeometryUtils.mergeGeometries(parts); };
-    const grassMat = mats.sway(new T.MeshStandardMaterial({ map: RC.Tex.leaves(T, 'grass'), alphaTest: 0.4, side: T.DoubleSide, roughness: 0.9 }), 0.35);
-    plantSet(brush.grass, crossed(0.85, 0.48, 3), grassMat, [0.7, 1.25], '#9bd06a', false);
+    const grassMat = mats.sway(new T.MeshStandardMaterial({ map: RC.Tex.leaves(T, 'grass'), alphaTest: 0.4, side: T.DoubleSide, roughness: 0.9, vertexColors: true }), 0.35);
+    const gm = plantSet(brush.grass, clump(0.5, 0.3, 5), grassMat, [0.75, 1.3], '#ffffff', false);
+    if (gm) brush.grass.forEach(([x, z], i) => { const c = Math.floor(x), r = Math.floor(z), patch = noise(c, r, 5) * 0.6 + noise(c, r, 2) * 0.4, meadow = at(c, r) === ','; gm.setColorAt(i, col.setHSL((meadow ? 92 : 98 + patch * 10) / 360, (meadow ? 46 : 44 + patch * 10) / 100, ((meadow ? 50 : 40) + patch * 10) / 100 + 0.1)); });
     const reedMat = mats.sway(new T.MeshStandardMaterial({ map: RC.Tex.leaves(T, 'reed'), alphaTest: 0.4, side: T.DoubleSide, roughness: 0.9 }), 0.2);
     plantSet(brush.reed, crossed(0.7, 1.2, 3), reedMat, [0.8, 1.3], '#ffffff');
     const stone = RC.Tex.surface(T, 'stone'); const rockMat = new T.MeshStandardMaterial({ vertexColors: true, map: stone.map, normalMap: stone.normalMap, roughness: 0.95 });

@@ -17,7 +17,7 @@
       r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.05; r.outputColorSpace = THREE.SRGBColorSpace;
       host.append(r.domElement); this.canvas = r.domElement;
       this.scene = new THREE.Scene(); this.scene.fog = new THREE.Fog('#9fd0ff', 60, 150);
-      this.camera = new THREE.PerspectiveCamera(32, 1, 0.4, 900);
+      this.camera = new THREE.PerspectiveCamera(32, 1, 0.1, 900);
       // the sky: scattering by the sun's height (blue day, orange dusk), stars at night
       this.sky = new THREE.Sky(); this.sky.scale.setScalar(380); this.scene.add(this.sky);
       const su = this.sky.material.uniforms; su.turbidity.value = 5; su.rayleigh.value = 1.6; su.mieCoefficient.value = 0.004; su.mieDirectionalG.value = 0.82;
@@ -38,6 +38,12 @@
       for (const p of [...sim.people, ...sim.players]) {
         const rg = RC.Cast.rig(THREE, p.def.look || {}, p.def.age || 'adult', { job: p.def.job, player: !!p.isPlayer, carries: p.def.carries });
         this.scene.add(rg.root); this.rigs.set(p, rg);
+        if (p.isPlayer) {   // seen through whatever hides you: a dim glowing outline of your figure, drawn only where something is in front
+          const xm = new THREE.MeshBasicMaterial({ color: '#9fd4ff', transparent: true, opacity: 0.42, depthFunc: THREE.GreaterDepth, depthWrite: false, fog: false });
+          const meshes = []; rg.root.traverse((o) => { if (o.isMesh) meshes.push(o); });
+          for (const o of meshes) { const s = new THREE.Mesh(o.geometry, xm); s.renderOrder = 998; s.castShadow = false; o.add(s); }
+          for (const o of meshes) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 1; o.material.depthWrite = true; o.renderOrder = 999; }   // (your figure is drawn after the outline)
+        }
       }
       this.initWeather();
       this.cam = { x: sim.players[0].x, y: 0, z: sim.players[0].z, dist: 26.5, elev: 0.64, look: 0.35, init: false };
@@ -92,7 +98,7 @@
       if (talk) { tx = RC.lerp(pl.x, talk.x, 0.56); tz = RC.lerp(pl.z, talk.z, 0.56); dist = 6.9; elev = 0.28; lookY = 1.24; }
       else {
         if (sim.viewMode === 'map') { dist = Math.max(this.realm.w, this.realm.h) * 1.18 + 10; tx = RC.lerp(this.realm.w / 2, pl.x, 0.22); tz = RC.lerp(this.realm.h / 2, pl.z, 0.22); }
-        dist *= sim.zoom;
+        dist *= sim.zoom; if (sim.zoom < 0.4) { const k = (0.4 - sim.zoom) / 0.3; elev = RC.lerp(elev, 0.3, k); lookY = RC.lerp(0.35, 0.9, k); }
       }
       const c = this.cam, ty = sim.terrain.groundY(tx, tz);
       if (!c.init) Object.assign(c, { x: tx, y: ty, z: tz, dist, elev, look: lookY, init: true });
@@ -124,7 +130,7 @@
       }
       for (const fn of this.tickers) fn(t, { night: this.night, cam: this.cam, season: now.seasonIndex });
       if (this.bloom) this.bloom.strength = 0.18 + this.night * 0.55;
-      this.fadeBlockers(pl);
+      if (RC.settings.seeThrough === 'fade') this.fadeBlockers(pl);
       if (this.composer) this.composer.render(dt); else this.renderer.render(this.scene, this.camera);
     }
     // buildings between the camera and you turn see-through (walk behind them and still see yourself)
