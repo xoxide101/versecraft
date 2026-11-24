@@ -50,29 +50,9 @@
       };
       const label = (text, x, y, z, kind) => labels.push({ text, x, y, z, kind: kind || 'place' });
 
-      // ---- trees: one per forest cell, three shapes, instanced
-      const treeCells = []; for (let r = 0; r < realm.h; r++) for (let c = 0; c < realm.w; c++) if (terrain.paint[r][c] === 'T') treeCells.push([c, r]);
-      const trunkGeo = new THREE.CylinderGeometry(0.09, 0.16, 1.3, 6).translate(0, 0.65, 0);
-      const canopies = [0, 1, 2].map((v) => { const parts = []; const n = 3 + v; for (let i = 0; i < n; i++) { const r = 0.55 + RC.hash(i, v, 4) * 0.35; const ge = new THREE.IcosahedronGeometry(r, 0); ge.translate((RC.hash(i, v, 1) - 0.5) * 0.7, 1.4 + i * 0.32 + RC.hash(i, v, 2) * 0.3, (RC.hash(v, i, 3) - 0.5) * 0.7); parts.push(ge); } return THREE.BufferGeometryUtils.mergeGeometries(parts); });
-      const trunkMesh = new THREE.InstancedMesh(trunkGeo, M('#6b4226'), treeCells.length); trunkMesh.castShadow = true;
-      const leafMat = sway(M('#ffffff', { flatShading: true, roughness: 0.8 }), 0.05);
-      const leafMeshes = canopies.map((ge) => { const m = new THREE.InstancedMesh(ge, leafMat, treeCells.length); m.castShadow = true; m.receiveShadow = true; m.count = 0; return m; });
-      const tm = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), col = new THREE.Color();
-      const greens = ['#3f8f3a', '#4ca04a', '#5cb25a', '#357a36', '#6cbf4a'];
-      treeCells.forEach(([c, r], i) => {
-        const x = c + 0.5 + (RC.hash(c, r, 5) - 0.5) * 0.6, z = r + 0.5 + (RC.hash(r, c, 6) - 0.5) * 0.6, s = 0.85 + RC.hash(c, r, 7) * 0.6;
-        q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), RC.hash(c, r, 8) * 6.28); ps.set(x, Y(x, z), z); sc.set(s, s * (0.9 + RC.hash(c, r, 9) * 0.3), s); tm.compose(ps, q, sc);
-        trunkMesh.setMatrixAt(i, tm);
-        const lm = leafMeshes[Math.floor(RC.hash(c, r, 10) * 3)]; lm.setMatrixAt(lm.count, tm); lm.setColorAt(lm.count, col.set(greens[Math.floor(RC.hash(c, r, 12) * greens.length)])); lm.count++;
-      });
-      g.add(trunkMesh, ...leafMeshes);
-
-      // ---- grass tufts on grass, little flowers on meadow (instanced, swaying)
-      const tuftGeo = (() => { const parts = []; for (let i = 0; i < 3; i++) { const p = new THREE.PlaneGeometry(0.05, 0.2).translate(0, 0.1, 0); p.rotateY(i * 1.05); parts.push(p); } return THREE.BufferGeometryUtils.mergeGeometries(parts); })();
-      const spots = []; for (let r = 0; r < realm.h; r++) for (let c = 0; c < realm.w; c++) { const k = terrain.paint[r][c]; if (k === '.' || k === ',') for (let i = 0; i < (k === '.' ? 3 : 1); i++) if (RC.hash(c * 9 + i, r, 25) < RC.quality.grass) spots.push([c + RC.hash(c * 5 + i, r, 21), r + RC.hash(c, r * 5 + i, 22), k]); }
-      const tufts = new THREE.InstancedMesh(tuftGeo, sway(M('#ffffff', { side: THREE.DoubleSide, roughness: 1 }), 0.45), spots.length);
-      spots.forEach(([x, z, k], i) => { const s = 0.6 + RC.hash(i, 1, 23) * 0.7; tm.compose(ps.set(x, Y(x, z), z), q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), RC.hash(i, 2, 24) * 6.28), sc.set(s, s, s)); tufts.setMatrixAt(i, tm); tufts.setColorAt(i, col.set(k === ',' ? ['#a6dd78', '#c3e88d', '#f5d0fe', '#fde68a'][i % 4] : ['#4f9a3a', '#5fae46', '#76c25a'][i % 3])); });
-      tufts.receiveShadow = true; g.add(tufts);
+      // ---- trees, brush, grass, reeds, rocks (rc-flora.js)
+      const flora = RC.Flora.plant(THREE, realm, terrain, shared); g.add(flora.group); tickers.push(...flora.tickers);
+      const tm = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3();
 
       // ---- piers: planks over '=' cells, posts at the corners
       const pierCells = []; for (let r = 0; r < realm.h; r++) for (let c = 0; c < realm.w; c++) if (terrain.paint[r][c] === '=') pierCells.push([c, r]);
@@ -81,12 +61,9 @@
       plank.receiveShadow = plank.castShadow = true; g.add(plank, post);
 
       // ---- buildings
-      const wallTex = (kind) => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d');
-        if (kind === 'stone' || kind === 'darkstone') { x.fillStyle = kind === 'stone' ? '#c9c3b6' : '#6b6f78'; x.fillRect(0, 0, 128, 128); for (let r = 0; r < 8; r++) for (let c = 0; c < 4; c++) { x.fillStyle = `hsl(35, 8%, ${(kind === 'stone' ? 66 : 38) + RC.hash(c, r, 40) * 12}%)`; x.fillRect(c * 32 + (r % 2) * 16 + 1, r * 16 + 1, 30, 14); } }
-        else { x.fillStyle = '#f2eadb'; x.fillRect(0, 0, 128, 128); if (kind === 'timber') { x.fillStyle = '#5b3a1f'; x.fillRect(0, 0, 128, 8); x.fillRect(0, 120, 128, 8); x.fillRect(0, 0, 8, 128); x.fillRect(60, 0, 8, 128); x.save(); x.translate(64, 64); x.rotate(0.7); x.fillRect(-90, -4, 180, 7); x.restore(); } }
-        const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
-      const WT = { plaster: wallTex('plaster'), timber: wallTex('timber'), stone: wallTex('stone'), darkstone: wallTex('darkstone') };
-      const roofTex = (() => { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64; const x = cv.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 64, 64); x.fillStyle = 'rgba(0,0,0,.22)'; for (let r = 0; r < 8; r++) { x.fillRect(0, r * 8 + 6, 64, 2); for (let c = 0; c < 4; c++) x.fillRect(c * 16 + (r % 2) * 8, r * 8, 1.5, 8); } const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; })();
+      const surf = (k) => RC.Tex.surface(THREE, k);
+      const WT = { plaster: surf('plaster'), timber: surf('timber'), stone: surf('stone'), darkstone: surf('darkstone') }, RT = surf('roof');
+
       const STYLE = {
         one_story_cottage: { wall: 'timber', h: 2.4, roof: 1.6 }, two_story_timber: { wall: 'timber', h: 3.8, roof: 1.8 }, smithery_foundry: { wall: 'darkstone', h: 2.8, roof: 1.4, bigChimney: true },
         observatory_parlor: { wall: 'plaster', h: 2.8, roof: 1.5, tower: true }, grand_guildhall: { wall: 'stone', h: 4.0, roof: 1.9, columns: true }, l_wing_inn: { wall: 'timber', h: 3.4, roof: 1.7, wing: true },
@@ -96,8 +73,9 @@
       for (const b of realm.things.filter((t) => t.kind === 'building')) {
         const st = STYLE[b.style] || STYLE.one_story_cottage, grp = new THREE.Group(), fadeMats = [];
         const z0 = b.z + 0.5, z1 = b.z + b.d - 0.25, D = z1 - z0, cx = b.x + b.w / 2, cz = (z0 + z1) / 2, W = b.w - 0.3;
-        const wt = WT[st.wall].clone(); wt.needsUpdate = true; wt.repeat.set(W / 2.4, st.h / 2.4);
-        const wallM = M('#ffffff', { map: wt }); const roofM = M(ROOF[b.roof] || '#b4232a', { map: roofTex, roughness: 0.7 }); roofTex.repeat.set(3, 2); fadeMats.push(wallM, roofM);
+        const rep = (tx, x, y) => { const c = tx.clone(); c.needsUpdate = true; c.repeat.set(x, y); return c; };
+        const wallM = M('#ffffff', { map: rep(WT[st.wall].map, W / 2.6, st.h / 2.6), normalMap: rep(WT[st.wall].normalMap, W / 2.6, st.h / 2.6), roughness: 0.92 });
+        const roofM = M(ROOF[b.roof] || '#b4232a', { map: rep(RT.map, W / 2.2, 1.6), normalMap: rep(RT.normalMap, W / 2.2, 1.6), roughness: 0.75 }); fadeMats.push(wallM, roofM);
         grp.add(box(W, st.h, D, wallM));
         const rf = gable(W + 0.6, D + 0.8, st.roof, roofM); rf.position.y = st.h; grp.add(rf);
         grp.add(box(W + 0.2, 0.25, D + 0.2, mats.darkStone, 0, -0.05, 0));   // plinth
@@ -119,6 +97,7 @@
       }
 
       // ---- the smaller things
+      const floraMats = RC.Flora.materials(THREE, shared);
       const make = {
         lamp: () => { const o = new THREE.Group(); o.add(cyl(0.05, 0.07, 2.2, mats.iron, 8)); o.add(box(0.42, 0.06, 0.06, mats.iron, 0.18, 2.1, 0)); const l = box(0.22, 0.3, 0.22, mats.glow, 0.36, 1.82, 0); o.add(l); return o; },
         fountain: () => { const o = new THREE.Group(); o.add(cyl(1.6, 1.7, 0.45, mats.white, 24)); o.add(cyl(1.35, 1.35, 0.06, new THREE.MeshStandardMaterial({ color: '#4aa3e8', roughness: 0.15 }), 24, 0, 0.36)); o.add(cyl(0.25, 0.3, 1.1, mats.white, 12)); o.add(cyl(0.75, 0.55, 0.22, mats.white, 16, 0, 1.0)); o.add(cyl(0.12, 0.15, 0.6, mats.white, 8, 0, 1.2)); return o; },
@@ -134,7 +113,9 @@
         bell: () => { const o = new THREE.Group(); o.add(box(0.1, 2, 0.1, mats.wood, -0.5)); o.add(box(0.1, 2, 0.1, mats.wood, 0.5)); o.add(box(1.2, 0.12, 0.14, mats.wood, 0, 2, 0)); const b = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.45, 12, 1, true), mats.brass); b.position.y = 1.7; o.add(b); return o; },
         campfire: () => { const o = new THREE.Group(); for (let i = 0; i < 4; i++) { const l = cyl(0.06, 0.06, 0.7, mats.darkWood, 6); l.rotation.z = 1.4; l.rotation.y = i * 0.8; l.position.y = 0.1; o.add(l); } const fl = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.5, 6), mats.glow); fl.position.y = 0.3; o.add(fl); return o; },
         bookshelf: () => box(1.2, 1.8, 0.4, M('#6b4226')),
-        shrub: (t) => { const o = new THREE.Group(); const c = { berry: '#2f7d32', fern: '#4c9a2a', blossom: '#5aa647', frost_bush: '#7fb3a8', ember_fern: '#8a5a2b' }[t.variant] || '#3f8f3a'; for (let i = 0; i < 4; i++) { const s = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3 + RC.hash(i, 3, 3) * 0.12, 0), M(c, { flatShading: true })); s.position.set((RC.hash(i, 1, 1) - 0.5) * 0.5, 0.3, (RC.hash(i, 2, 2) - 0.5) * 0.5); o.add(s); } if (t.variant === 'berry' || t.variant === 'blossom') for (let i = 0; i < 6; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 4), M(t.variant === 'berry' ? '#c81e4a' : '#f9a8d4')); b.position.set((RC.hash(i, 4, 4) - 0.5) * 0.7, 0.35 + RC.hash(i, 5, 5) * 0.3, (RC.hash(i, 6, 6) - 0.5) * 0.7); o.add(b); } return o; },
+        shrub: (t) => { const kind = { berry: 'berry', fern: 'fern', blossom: 'blossom', frost_bush: 'frost_bush', ember_fern: 'ember_fern' }[t.variant] || 'bush', fb = RC.Flora.bush(THREE, kind, Math.floor(t.x * 7 + t.z), 1);
+          const lm = floraMats.leafMat(fb.leaf, 0.06), o = new THREE.Group(), m = new THREE.Mesh(fb.leaves, lm); m.customDepthMaterial = lm.userData.depth; o.add(m);
+          const tint = new THREE.Color(fb.color), c = fb.leaves.attributes.color; for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) * tint.r, c.getY(i) * tint.g, c.getZ(i) * tint.b); o.scale.setScalar(1.15); return o; },
         chest: () => { const o = new THREE.Group(); o.add(box(0.7, 0.4, 0.45, M('#8b5a2b'))); const lid = box(0.72, 0.16, 0.47, M('#6b4226'), 0, 0.4, 0); lid.name = 'lid'; o.add(lid); o.add(box(0.12, 0.14, 0.05, mats.brass, 0, 0.32, 0.24)); return o; },
         forage: (t) => { const o = new THREE.Group(); const n = t.node;
           if (/vein/.test(n)) { const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 0), M('#7b7f86', { flatShading: true })); rock.position.y = 0.25; o.add(rock); for (let i = 0; i < 4; i++) { const s = new THREE.Mesh(new THREE.OctahedronGeometry(0.08), M(n.startsWith('silver') ? '#e5e7eb' : n.startsWith('obsidian') ? '#1f1530' : '#b4693a', { metalness: 0.6, roughness: 0.3 })); s.position.set((RC.hash(i, 1, 9) - 0.5) * 0.6, 0.3 + RC.hash(i, 2, 9) * 0.3, 0.3); o.add(s); } }

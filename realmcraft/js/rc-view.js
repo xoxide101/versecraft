@@ -17,12 +17,18 @@
       r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.05; r.outputColorSpace = THREE.SRGBColorSpace;
       host.append(r.domElement); this.canvas = r.domElement;
       this.scene = new THREE.Scene(); this.scene.fog = new THREE.Fog('#9fd0ff', 60, 150);
-      this.camera = new THREE.PerspectiveCamera(32, 1, 0.4, 600);
+      this.camera = new THREE.PerspectiveCamera(32, 1, 0.4, 900);
+      // the sky: scattering by the sun's height (blue day, orange dusk), stars at night
+      this.sky = new THREE.Sky(); this.sky.scale.setScalar(380); this.scene.add(this.sky);
+      const su = this.sky.material.uniforms; su.turbidity.value = 5; su.rayleigh.value = 1.6; su.mieCoefficient.value = 0.004; su.mieDirectionalG.value = 0.82;
+      const sp = new Float32Array(1500 * 3); for (let i = 0; i < 1500; i++) { const a = Math.random() * 6.28, e = Math.acos(Math.random() * 0.95), r = 360; sp.set([Math.cos(a) * Math.sin(e) * r, Math.cos(e) * r, Math.sin(a) * Math.sin(e) * r], i * 3); }
+      const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+      this.stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: '#ffffff', size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false })); this.scene.add(this.stars);
       this.hemi = new THREE.HemisphereLight('#dbeafe', '#4d7c3a', 0.8); this.scene.add(this.hemi);
       this.sun = new THREE.DirectionalLight('#fff4e0', 1.6); this.sun.castShadow = true; const sc = this.sun.shadow;
       sc.mapSize.set(RC.quality.shadowMap, RC.quality.shadowMap); sc.camera.left = sc.camera.bottom = -26; sc.camera.right = sc.camera.top = 26; sc.camera.near = 1; sc.camera.far = 120; sc.bias = -0.0004; sc.normalBias = 0.03;
       this.scene.add(this.sun, this.sun.target);
-      this.shared = { uTime: { value: 0 }, uWind: { value: new THREE.Vector3(0.3, 0.1, 0.4) } };
+      this.shared = { uTime: { value: 0 }, uWind: { value: new THREE.Vector3(0.3, 0.1, 0.4) }, uCam: { value: new THREE.Vector3() }, uPlayer: { value: new THREE.Vector3() } };
       // the land and what's on it
       this.scene.add(sim.terrain.build(THREE));
       const map = RC.MapCraft.build(THREE, realm, sim.terrain, this.shared);
@@ -36,9 +42,19 @@
       this.initWeather();
       this.cam = { x: sim.players[0].x, y: 0, z: sim.players[0].z, dist: 26.5, elev: 0.64, look: 0.35, init: false };
       this.ray = new THREE.Raycaster(); this.faded = new Set();
+      // after-effects (not on low-power devices): soft shading where things meet, a glow on lights
+      if (RC.quality.tier !== 'low') {
+        try {
+          const c = (this.composer = new THREE.EffectComposer(r)); c.addPass(new THREE.RenderPass(this.scene, this.camera));
+          this.ao = new THREE.GTAOPass(this.scene, this.camera, 800, 600); this.ao.blendIntensity = 0.85;
+          this.ao.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.2, thickness: 1.2, scale: 1, samples: RC.quality.tier === 'high' ? 16 : 10 }); c.addPass(this.ao);
+          this.bloom = new THREE.UnrealBloomPass(new THREE.Vector2(800, 600), 0.25, 0.5, 0.88); c.addPass(this.bloom);
+          c.addPass(new THREE.OutputPass());
+        } catch (e) { console.warn('after-effects off:', e); this.composer = null; }
+      }
       this.resize(); addEventListener('resize', () => this.resize());
     }
-    resize() { const w = this.canvas.parentElement.clientWidth, h = this.canvas.parentElement.clientHeight; this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); }
+    resize() { const w = this.canvas.parentElement.clientWidth, h = this.canvas.parentElement.clientHeight; this.renderer.setSize(w, h); if (this.composer) this.composer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); }
 
     initWeather() {
       const T = this.T, N = 2600, pos = new Float32Array(N * 6);
@@ -62,6 +78,11 @@
       let sunI = RC.lerp(a[2], b[2], k) * (1 - grey * 0.6), amb = RC.lerp(a[3], b[3], k);
       if (sim.flash > 0) { sky.lerp(new T.Color('#ffffff'), sim.flash * 0.7); amb += sim.flash * 2; }
       this.scene.background = sky; this.scene.fog.color.copy(sky);
+      const su = this.sky.material.uniforms, sunUp = Math.sin((f - 0.25) * Math.PI * 2);
+      su.sunPosition.value.set(Math.cos((f - 0.25) * Math.PI * 2) * 100, sunUp * 100, 30);
+      su.turbidity.value = 4 + grey * 14; su.rayleigh.value = 1.6 - grey * 1.2 + (sunUp < 0.2 ? 0.8 : 0);
+      this.sky.visible = grey < 0.6; if (this.sky.visible) this.scene.background = null;
+      this.stars.material.opacity = RC.clamp((0.05 - sunUp) * 4, 0, 1) * (1 - grey);
       this.night = RC.clamp(1 - (sunI - 0.1) / 0.8, 0, 1);
       const sa = (f - 0.25) * Math.PI * 2;   // sun's path: rises in the east at dawn
       this.sun.intensity = sunI; this.hemi.intensity = amb; this.sun.color.set(f < 0.3 || f > 0.75 ? '#ffc58a' : '#fff4e0');
@@ -85,7 +106,8 @@
       c.yaw = RC.dampAngle(c.yaw != null ? c.yaw : yaw, this.talkYaw != null ? this.talkYaw : yaw, talk ? 4 : 12, dt); yaw = c.yaw;
       this.camera.position.set(c.x + Math.sin(yaw) * horiz + (Math.random() - 0.5) * 0.28 * sh, c.y + c.dist * Math.sin(c.elev) + (Math.random() - 0.5) * 0.18 * sh, c.z + Math.cos(yaw) * horiz);
       this.camera.lookAt(c.x, c.y + c.look, c.z);
-      this.camera.far = Math.max(200, c.dist * 3); this.scene.fog.near = Math.max(50, c.dist * 1.4); this.scene.fog.far = Math.max(140, c.dist * 3.2); this.camera.updateProjectionMatrix();
+      this.shared.uCam.value.copy(this.camera.position); this.shared.uPlayer.value.set(pl.x, sim.terrain.groundY(pl.x, pl.z) + 0.9, pl.z);
+      this.camera.far = Math.max(900, c.dist * 3); this.sky.position.set(c.x, 0, c.z); this.stars.position.set(c.x, 0, c.z); this.scene.fog.near = Math.max(50, c.dist * 1.4); this.scene.fog.far = Math.max(140, c.dist * 3.2); this.camera.updateProjectionMatrix();
       // the sun's shadow box follows what you look at
       this.sun.position.set(c.x + Math.cos(sa) * 30, Math.max(8, Math.sin(sa) * 45 + 10), c.z + 18); this.sun.target.position.set(c.x, c.y, c.z);
       const box = RC.clamp(c.dist * 0.9, 18, 70), scam = this.sun.shadow.camera; if (scam.right !== box) { scam.left = scam.bottom = -box; scam.right = scam.top = box; scam.updateProjectionMatrix(); }
@@ -100,9 +122,10 @@
         rg.root.position.set(p.x, sim.terrain.groundY(p.x, p.z), p.z); rg.root.rotation.y = Math.PI / 2 - p.angle;
         if (p.ring !== 'far' || (this.frameN = (this.frameN || 0) + 1) % 4 === 0) rg.update(p, t);   // detail rings: far bodies animate less often
       }
-      for (const fn of this.tickers) fn(t, { night: this.night, cam: this.cam });
+      for (const fn of this.tickers) fn(t, { night: this.night, cam: this.cam, season: now.seasonIndex });
+      if (this.bloom) this.bloom.strength = 0.18 + this.night * 0.55;
       this.fadeBlockers(pl);
-      this.renderer.render(this.scene, this.camera);
+      if (this.composer) this.composer.render(dt); else this.renderer.render(this.scene, this.camera);
     }
     // buildings between the camera and you turn see-through (walk behind them and still see yourself)
     fadeBlockers(pl) {
