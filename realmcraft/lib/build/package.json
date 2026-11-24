@@ -1,0 +1,8 @@
+{
+  "name": "realmcraft-libs",
+  "private": true,
+  "description": "Bundles three.js for RealmCraft into lib/realm-libs.js: npm install, then npm run build",
+  "scripts": { "build": "esbuild entry.js --bundle --minify --format=iife --legal-comments=eof --outfile=../realm-libs.js" },
+  "dependencies": { "three": "0.186.1" },
+  "devDependencies": { "esbuild": "0.28.2" }
+}

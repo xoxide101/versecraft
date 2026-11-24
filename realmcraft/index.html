@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RealmCraft</title>
+<style>
+  :root { --ink: #e8f0ff; --panel: rgba(14, 24, 52, .82); --edge: rgba(120, 160, 255, .45); --gold: #facc15; --dim: #9fb3d9; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0b1230; color: var(--ink); font: 13px/1.3 system-ui, "Segoe UI", sans-serif; overflow: hidden; }
+  #stage, #ui { position: fixed; inset: 0; }
+  #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #ui { pointer-events: none; }
+  .panel { background: var(--panel); border: 1.5px solid var(--edge); border-radius: 10px; box-shadow: 0 4px 18px rgba(0,0,0,.35); backdrop-filter: blur(3px); }
+  .card { position: absolute; left: 14px; top: 14px; display: flex; gap: 12px; align-items: center; padding: 10px 16px 10px 10px; min-width: 250px; }
+  .avatar { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font: 700 26px system-ui; background: radial-gradient(circle at 40% 35%, #f87171, #991b1b); border: 2px solid var(--edge); }
+  .who b { display: block; font-size: 18px; } .who small { color: var(--dim); } .who .line { color: var(--gold); font-weight: 600; margin-top: 3px; }
+  .right { position: absolute; right: 14px; top: 14px; width: 236px; display: grid; gap: 8px; }
+  .mapbox { padding: 8px; } .mapbox .title { color: var(--gold); font: 800 13px system-ui; letter-spacing: .04em; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .minimap { width: 100%; image-rendering: pixelated; border-radius: 6px; border: 1px solid var(--edge); display: block; }
+  .small { padding: 7px 10px; } .small b { display: flex; justify-content: space-between; font-size: 12.5px; letter-spacing: .03em; } .small small { display: block; color: var(--dim); font-size: 11px; margin-top: 2px; }
+  .cbox { display: flex; align-items: center; gap: 8px; padding: 6px 10px; } .compass { width: 90px; height: 90px; } .ctext small { display: block; color: var(--dim); font-size: 10px; } .ctext b { display: block; color: #cfe3ff; font-size: 14px; margin-bottom: 4px; }
+  .labels { position: absolute; inset: 0; overflow: hidden; }
+  .label { position: absolute; left: 0; top: 0; padding: 2px 8px; border-radius: 5px; background: rgba(14, 24, 52, .78); border: 1px solid rgba(120,160,255,.35); font: 700 11px ui-monospace, Consolas, monospace; letter-spacing: .04em; white-space: nowrap; text-transform: uppercase; }
+  .label i { display: block; font: italic 600 10px system-ui; color: #a7f3d0; text-transform: none; letter-spacing: 0; }
+  .label.building { color: #fde68a; border-color: rgba(250, 204, 21, .45); } .label.important { color: #fef08a; } .label.station { color: #a7f3d0; }
+  .prompt { position: absolute; left: 0; top: 0; padding: 4px 12px; border-radius: 6px; background: rgba(14,24,52,.92); border: 1.5px solid var(--gold); color: #fff; font: 800 12px ui-monospace, Consolas, monospace; letter-spacing: .05em; white-space: nowrap; }
+  .toast { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); padding: 7px 16px; border-radius: 8px; background: var(--panel); border: 1.5px solid var(--edge); font-weight: 600; }
+  .dialogue { position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%); width: min(900px, 92vw); min-height: 120px; padding: 30px 26px 18px; border-radius: 12px; background: rgba(12, 22, 50, .9); border: 2px solid var(--edge); box-shadow: 0 6px 30px rgba(0,0,0,.45); }
+  .dialogue .name { position: absolute; left: 22px; top: -17px; padding: 5px 16px; border-radius: 7px; background: #0e1a3c; border: 2px solid var(--edge); color: var(--gold); font: 800 15px system-ui; letter-spacing: .03em; }
+  .dialogue .text { font-size: 17px; line-height: 1.45; } .dialogue .more { position: absolute; right: 18px; bottom: 10px; color: var(--dim); font: 700 11px ui-monospace, Consolas, monospace; }
+  .help { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); padding: 4px 12px; border-radius: 6px; background: rgba(14,24,52,.6); color: var(--dim); font-size: 11.5px; white-space: nowrap; }
+  @media (max-width: 700px) { .right { width: 150px; } .cbox, .help { display: none; } .card { min-width: 0; padding: 6px 10px 6px 6px; } .avatar { width: 38px; height: 38px; font-size: 19px; } .who b { font-size: 15px; } .dialogue .text { font-size: 15px; } }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="ui"></div>
+<script src="lib/realm-libs.js"></script>
+<script src="js/rc-core.js"></script>
+<script src="js/rc-calendar.js"></script>
+<script src="js/rc-terrain.js"></script>
+<script src="js/rc-map.js"></script>
+<script src="js/rc-cast.js"></script>
+<script src="js/rc-view.js"></script>
+<script src="js/rc-play.js"></script>
+<script src="js/rc-hud.js"></script>
+<script src="js/rc-main.js"></script>
+<script src="data/wrenhaven.js"></script>
+<script>RC.boot(new URLSearchParams(location.search).get('realm') || 'wrenhaven');</script>
+</body>
+</html>

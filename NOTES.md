@@ -30,3 +30,26 @@ References (styles and ideas only): Ys (TurboGrafx-16 CD), Gauntlet 1/2/Dark Leg
 
 ## Start point
 ArcadeEvo's town (see [docs/arcadeevo-map.md](docs/arcadeevo-map.md)): first match it side by side in RealmCraft, then grow.
+
+## Detail rings (level of detail for everything, not just looks)
+Around the player: **near** = full life every step and full animation; **mid** = thought about every 3rd step; **far** = every 8th, animated less.
+Sized to the device (phone smaller, gaming PC bigger: `RC.quality`, or `?quality=low|high`), and shrunk while the frame rate is under 40.
+Later the same rings decide drawing detail (simpler models, then stand-ins far away), sounds, which activities run in full or only as a summary
+("the baker baked 40 loaves today"), and what a server keeps live when there are many players.
+
+## RealmCraft (step 1, 2026-11-23)
+Open `realmcraft/index.html` (works straight from the folder, no server). Keys: WASD move, Shift run, Space talk / use, Q E turn 90°, drag to turn,
+wheel zoom, V view (close, Evo 2.5D, wide, whole map), R north, T +3 hours, G sky. `?realm=` picks the realm file.
+| File | Job |
+|---|---|
+| `js/rc-core.js` | helpers, input, the loop (sim steps apart from drawing) |
+| `js/rc-calendar.js` | the world's calendar: hours per day, week days, months, seasons, years |
+| `js/rc-terrain.js` | TerrainCraft: painted ground letters + shaping steps (terraces, sea floor) → mesh, ground picture, water |
+| `js/rc-map.js` | MapCraft: things on the land (8 building styles, trees, grass, piers, lamps, fountain, boats, shrubs, chests, gathering spots, stations) |
+| `js/rc-cast.js` | the Cast: routines, jobs, reactions, going home at night, rain shelter; jointed bodies by age (infant to elder) with job props |
+| `js/rc-view.js` | renderer, sky and sun by time of day, weather, ArcadeEvo's camera + side-on talk zoom, see-through buildings, lamp lights |
+| `js/rc-play.js` | the sim: walking, bumping, talking, searching, chests, gathering, signs, weather and wind, detail rings |
+| `js/rc-hud.js` | the HUD in HTML: card, minimap, view, clock, compass with wind, labels (nearest, no overlaps), prompt, dialogue |
+| `data/wrenhaven.js` | the town as data (made by `tools/from_arcadeevo.py` from ArcadeEvo's town, names swapped; edit freely) |
+| `lib/realm-libs.js` | three.js 0.186 in one plain script (`lib/build`: npm install, npm run build) |
+Not yet: interiors, the land beyond the gate, crafting, combat, music, drawing styles, custom models, more players.
