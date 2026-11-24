@@ -30,7 +30,7 @@
   const ground = new T.Mesh(new T.PlaneGeometry(40, 40).rotateX(-Math.PI / 2), new T.MeshStandardMaterial({ color: '#7a8a60', roughness: 1 })); ground.receiveShadow = true; scene.add(ground);
   const names = Object.keys(window.RC_FOLK), folks = [];
   const looks = [{ tunic: '#93c5fd' }, { tunic: '#b45309' }, { tunic: '#f472b6' }, { tunic: '#34d399' }, { tunic: '#9ca3af' }, { tunic: '#a78bfa' }, { tunic: '#fbbf24' }, { tunic: '#f87171' }];
-  names.forEach((n, i) => { const f = RC.Folk.make({ id: 'p' + i, age: /elder/.test(n) ? 'elder' : /boy|girl/.test(n) ? 'child' : 'adult', sex: /woman|_f|girl/.test(n) ? 'f' : 'm', job: /stout/.test(n) ? 'hammer' : /^woman$/.test(n) ? 'baker' : 'stroll' }, looks[i], false); f.root.position.set((i - (names.length - 1) / 2) * 0.9, 0, 0); scene.add(f.root); folks.push(f); });
+  names.forEach((n, i) => { const f = RC.Folk.make({ id: 'p' + i, age: /elder/.test(n) ? 'elder' : /boy|girl/.test(n) ? 'child' : 'adult', sex: /woman|_f|girl/.test(n) ? 'f' : 'm', job: /stout/.test(n) ? 'hammer' : /^woman$/.test(n) ? 'baker' : 'stroll' }, looks[i % looks.length], false); f.root.position.set((i - (names.length - 1) / 2) * 0.9, 0, 0); scene.add(f.root); folks.push(f); });
   let walk = 0, near = false; const set = () => { if (near === 2) return; cam.position.set(near ? 0.4 : 0, near ? 1.5 : 1.6, near ? 2.2 : 9); cam.lookAt(near ? 0.4 : 0, near ? 1.35 : 0.9, 0); };
   document.getElementById('walk').onclick = () => (walk = 1); document.getElementById('idle').onclick = () => (walk = 0);
   document.getElementById('near').onclick = () => { near = true; set(); }; document.getElementById('far').onclick = () => { near = false; set(); }; set();

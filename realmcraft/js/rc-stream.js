@@ -44,7 +44,7 @@
       for (const b of def.bridges || []) {
         let i = 0; while (i < n - 2 && this.Z[i + 1] < b.z) i++;
         const f = (b.z - this.Z[i]) / Math.max(1e-4, this.Z[i + 1] - this.Z[i]), cx = lerp(this.X[i], this.X[i + 1], f), w = lerp(this.W[i], this.W[i + 1], f), wl = lerp(this.WL[i], this.WL[i + 1], f), bed = lerp(this.BED[i], this.BED[i + 1], f);
-        const L = b.length || 2 * (w + WALL + 1.0), x0 = cx - L / 2, x1 = cx + L / 2, y0 = (terrain.landRaw(x0, b.z) + terrain.landRaw(x1, b.z)) / 2 + 0.02, rise = b.kind === 'arch' ? 0.22 : 0.05;
+        const L = b.length || 2 * (w + WALL + 1.0), x0 = cx - L / 2, x1 = cx + L / 2, y0 = (terrain.landRaw(x0, b.z) + terrain.landRaw(x1, b.z)) / 2 + 0.02, rise = b.kind === 'arch' ? 0.22 : 0.34;
         const br = { kind: b.kind, cx, zc: b.z, L, width: b.width, y0, rise, wl, bed, w, x0, x1 }; this.bridges.push(br);
         this.decks.push({ x0, x1, z0: b.z - b.width / 2, z1: b.z + b.width / 2, heightAt: (z, x) => { const t = (x - cx) / (L / 2); return y0 + rise * (1 - t * t); } });
       }
@@ -69,10 +69,14 @@
     wet(x, z, pad = 0.2) { const d = this.find(x, z); if (d == null) return false; const i = this._i, t = this._t; return d < lerp(this.W[i], this.W[i + 1], t) + 0.05 + pad; }
     // 0..1: gravel and sand on the bed and its banks
     bed(x, z) { const d = this.find(x, z); if (d == null) return 0; const i = this._i, t = this._t, w = lerp(this.W[i], this.W[i + 1], t); return 1 - sm((d - w - 0.05) / 0.7); }
+    // stepping stones out to something in the water: each a small deck at its top, and a place you may stand
+    addStep(x, z, r, y) { this.steps = this.steps || []; this.steps.push({ x, z, r, y }); this.decks.push({ x0: x - r, x1: x + r, z0: z - r, z1: z + r, heightAt: () => y }); }
+    onStep(x, z, pad = 0) { return (this.steps || []).some((s) => Math.hypot(x - s.x, z - s.z) < s.r + pad); }
     onBridge(z, pad = 0) { return this.bridges.some((b) => Math.abs(z - b.zc) < b.width / 2 + pad); }
     // can a person of radius R stand here? Not in the water or on its banks, except on a bridge
     blocks(x, z, R) {
       for (const b of this.bridges) if (Math.abs(z - b.zc) < b.width / 2 && Math.abs(x - b.cx) < b.L / 2) return false;
+      if (this.onStep(x, z, 0.05)) return false;
       const d = this.find(x, z); if (d == null) return false; const i = this._i, t = this._t;
       return d < lerp(this.W[i], this.W[i + 1], t) + 0.1 + R;
     }
@@ -94,6 +98,21 @@
       const m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), v = new T.Vector3(), sc = new T.Vector3(1, 1, 1), UP = new T.Vector3(0, 1, 0);
       const shadow = (m) => { m.castShadow = m.receiveShadow = true; return m; };
 
+      // ---- stones in the stream: rocks on the bed breaking the surface; the water knows where each is (s along, across, size)
+      const SN = 48, stones = [], srnd = RC.rng(9191);
+      for (let s = 2.5; s < this.length - 3 && stones.length < SN; s += 0.7 + srnd() * 1.4) {
+        const c = this.atS(s); if (this.bridges.some((b) => Math.abs(c.z - b.zc) < b.width / 2 + 0.6)) continue;
+        const across = (srnd() - 0.5) * 1.5 * c.w, r = (0.1 + srnd() * 0.16) * Math.min(1.3, 0.7 + c.w);
+        stones.push({ s, across, r, x: c.x - c.tz * across, z: c.z + c.tx * across, y: c.wl - r * (0.25 + srnd() * 0.45) });
+        if (srnd() < 0.35 && stones.length < SN) { const a2 = across + (srnd() < 0.5 ? -1 : 1) * r * 1.8, r2 = r * (0.5 + srnd() * 0.3); stones.push({ s: s + (srnd() - 0.5) * 0.3, across: a2, r: r2, x: c.x - c.tz * a2, z: c.z + c.tx * a2, y: c.wl - r2 * 0.5 }); }   // (a smaller one beside it)
+      }
+      this.stones = stones;
+      {
+        const rockT2 = RC.Tex.real(T, 'rock_mossy'), sm2 = new T.MeshStandardMaterial({ vertexColors: true, map: rockT2 && rockT2.map, normalMap: rockT2 && rockT2.normalMap, roughness: 0.6 }), geo = RC.Flora.rock(T, 5);
+        const im = new T.InstancedMesh(geo, sm2, Math.max(1, stones.length)), col = new T.Color();
+        stones.forEach((st, i) => { m4.compose(v.set(st.x, st.y, st.z), q.setFromEuler(e.set(srnd() * 0.3, srnd() * 6.28, srnd() * 0.3)), sc.set(st.r * 2.2, st.r * 1.7, st.r * 2.0)); im.setMatrixAt(i, m4); im.setColorAt(i, col.set(['#8a8a80', '#7a7a70', '#6a6e62', '#9a968a'][i % 4])); });
+        sc.set(1, 1, 1); im.count = stones.length; im.castShadow = im.receiveShadow = true; im.userData.wetStones = true; g.add(im);
+      }
       // ---- the water: a ribbon along the path that flows downstream (ripples travel with the current, foam along the edges)
       {
         const pos = [], fl = [], tg = [], us = [], en = [], idx = [];
@@ -106,26 +125,35 @@
         ge.setAttribute('aUs', new T.Float32BufferAttribute(us, 1)); ge.setAttribute('aEn', new T.Float32BufferAttribute(en, 1)); ge.setAttribute('normal', new T.Float32BufferAttribute(pos.map((_, k) => (k % 3 === 1 ? 1 : 0)), 3)); ge.setIndex(idx);
         const mat = new T.MeshStandardMaterial({ color: '#ffffff', transparent: true, roughness: 0.04, metalness: 0, envMapIntensity: 1.3, depthWrite: false });
         mat.onBeforeCompile = (sh) => {
-          sh.uniforms.uTime = shared.uTime;
+          sh.uniforms.uTime = shared.uTime; sh.uniforms.uStones = { value: Array.from({ length: SN }, (_, i) => stones[i] ? new T.Vector3(stones[i].s, stones[i].across, stones[i].r) : new T.Vector3(-99, 0, 0)) };
           sh.vertexShader = 'attribute vec4 aFl; attribute vec2 aT; attribute float aUs; attribute float aEn; varying vec4 vFl; varying vec2 vT; varying float vUs; varying float vEn;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vFl = aFl; vT = aT; vUs = aUs; vEn = aEn;');
-          sh.fragmentShader = `uniform float uTime; varying vec4 vFl; varying vec2 vT; varying float vUs; varying float vEn;
+          sh.fragmentShader = `uniform float uTime; uniform vec3 uStones[${SN}]; varying vec4 vFl; varying vec2 vT; varying float vUs; varying float vEn;
             float sH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
             float sN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(sH(i), sH(i + vec2(1.0, 0.0)), f.x), mix(sH(i + vec2(0.0, 1.0)), sH(i + vec2(1.0, 1.0)), f.x), f.y); }\n` + sh.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
             {
               float ac = clamp(abs(vFl.y) / vFl.z, 0.0, 1.0);
+              // round each stone the water heaps and breaks white, a wake of ripples trails downstream, a calm pool just behind it
+              float churn = 0.0; vec2 sg = vec2(0.0);
+              for (int k = 0; k < ${SN}; k++) { vec3 st = uStones[k]; float ds = vFl.x - st.x, da = vFl.y - st.y; if (abs(ds) > 2.2 || abs(da) > 0.8) continue;
+                float d = length(vec2(ds, da)), ring = exp(-pow((d - st.z * 1.15) / (st.z * 0.35), 2.0)), wake = (ds > 0.0 ? exp(-ds / (st.z * 6.0)) : 0.0) * exp(-pow(da / (st.z * (1.0 + ds * 0.8)), 2.0));
+                churn += ring * (0.35 + 0.35 * sN(vec2(atan(da, ds) * 3.0, uTime * 3.0))) + wake * 0.55 * sN(vec2(da * 18.0, ds * 9.0 - uTime * 6.0));
+                sg += normalize(vec2(ds, da) + 1e-4) * ring * 0.5 + vec2(sin(ds * 30.0 - uTime * 9.0), 0.0) * wake * 0.25; }
               vec2 p = vec2(vFl.y, vFl.x - uTime * vFl.w);
               vec2 q1 = vec2(p.x * 2.6, p.y * 1.15), q2 = vec2(p.x * 5.5, p.y * 2.3 + 11.0); float e = 0.05;
               float a0 = sN(q1) + 0.5 * sN(q2);
-              vec2 g = vec2(sN(q1 + vec2(e, 0.0)) + 0.5 * sN(q2 + vec2(e * 2.1, 0.0)) - a0, sN(q1 + vec2(0.0, e)) + 0.5 * sN(q2 + vec2(0.0, e * 2.1)) - a0) / e * 0.05;
+              vec2 g = vec2(sN(q1 + vec2(e, 0.0)) + 0.5 * sN(q2 + vec2(e * 2.1, 0.0)) - a0, sN(q1 + vec2(0.0, e)) + 0.5 * sN(q2 + vec2(0.0, e * 2.1)) - a0) / e * 0.09;
               vec2 gw = g.x * vec2(-vT.y, vT.x) + g.y * vT;
               normal = normalize((viewMatrix * vec4(normalize(vec3(-gw.x, 1.0, -gw.y)), 0.0)).xyz);
               float mid = 1.0 - ac * ac;
-              diffuseColor.rgb = mix(vec3(0.30, 0.50, 0.46), vec3(0.07, 0.22, 0.30), smoothstep(0.0, 0.85, mid) * mix(0.55, 1.0, vUs));
-              diffuseColor.a = mix(0.9, 0.5, smoothstep(mix(0.45, 0.8, vUs), 1.0, ac)) * vEn;
+              diffuseColor.rgb = mix(vec3(0.34, 0.40, 0.30), vec3(0.06, 0.13, 0.13), smoothstep(0.0, 0.9, mid) * mix(0.6, 1.0, vUs));
+              diffuseColor.a = mix(0.72, 0.28, smoothstep(0.35, 1.0, ac)) * vEn;   // (see-through at the edges: the gravel bed shows)
               float fs = mix(0.55, 0.8, vUs);
-              float foam = smoothstep(fs, fs + 0.1, ac) * smoothstep(0.3, 0.7, sN(p * vec2(4.0, 2.0))) * 0.85 + smoothstep(0.66, 0.92, sN(vec2(p.x * 6.0, p.y * 0.7 + 3.0))) * 0.14;
+              float foam = smoothstep(0.86, 0.97, ac) * smoothstep(0.55, 0.85, sN(p * vec2(5.0, 2.4))) * 0.5 + smoothstep(0.8, 0.95, sN(vec2(p.x * 7.0, p.y * 0.8 + 3.0))) * 0.1 * vUs;
               foam = clamp(foam, 0.0, 1.0);
               diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.95, 0.95), foam); diffuseColor.a = max(diffuseColor.a * 1.0, foam * 0.85 * vEn);
+              float wf = clamp(churn, 0.0, 1.0) * smoothstep(0.35, 0.75, sN(vec2(vFl.y * 14.0, vFl.x * 7.0 - uTime * 5.0)) + 0.25);
+              diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.96, 0.96), wf * 0.55); diffuseColor.a = max(diffuseColor.a, wf * 0.55 * vEn); foam = max(foam, wf);
+              { vec2 gw2 = sg.x * vT + sg.y * vec2(-vT.y, vT.x); normal = normalize(normal + (viewMatrix * vec4(-gw2.x, 0.0, -gw2.y, 0.0)).xyz * 0.6); }
               roughnessFactor = mix(0.04, 0.5, foam);
             }`);
         };
@@ -222,11 +250,16 @@
       g.position.set(b.cx, 0, b.zc);
       const L = b.L + 0.5, nb = Math.round(L / 0.2);
       for (let i = 0; i < nb; i++) { const x = -L / 2 + (i + 0.5) * (L / nb), xx = clamp(x, -h, h), ang = Math.atan2(top(xx + 0.05) - top(xx - 0.05), 0.1); put(new T.BoxGeometry(L / nb - 0.015 - rnd() * 0.01, 0.06, W - 0.02 - rnd() * 0.05), x, top(xx) - 0.03, (rnd() - 0.5) * 0.03, ang, woods[Math.floor(rnd() * woods.length)]); }
+      // stringers and rails follow the hump: short straight pieces, each turned to the curve
+      const along = (yOff, thick, depth, zc, col, from = -L / 2, to = L / 2, N = 12) => { for (let i = 0; i < N; i++) { const xa = from + ((to - from) * i) / N, xb = from + ((to - from) * (i + 1)) / N, ya = top(clamp(xa, -h, h)) + yOff, yb = top(clamp(xb, -h, h)) + yOff;
+        put(new T.BoxGeometry(Math.hypot(xb - xa, yb - ya) + 0.02, thick, depth), (xa + xb) / 2, (ya + yb) / 2, zc, Math.atan2(yb - ya, xb - xa), col); } };
       for (const sd of [-1, 1]) {
-        put(new T.BoxGeometry(L, 0.13, 0.11), 0, b.y0 - 0.12, sd * (W / 2 - 0.2), 0, '#5e4630');
-        for (const x of [-h + 0.12, 0, h - 0.12]) put(new T.BoxGeometry(0.09, 0.95, 0.09), x, top(x) + 0.42, sd * (W / 2 - 0.05), 0, '#6a4e34');
-        for (const yy of [0.5, 0.84]) put(new T.BoxGeometry(b.L - 0.05, 0.06, 0.05), 0, top(0) + yy, sd * (W / 2 - 0.05), 0, '#7a5a3c');
+        along(-0.12, 0.14, 0.11, sd * (W / 2 - 0.2), '#5e4630');
+        const posts = 5; for (let k = 0; k < posts; k++) { const x = -h + 0.12 + ((2 * h - 0.24) * k) / (posts - 1); put(new T.BoxGeometry(0.09, 0.95, 0.09), x, top(x) + 0.42, sd * (W / 2 - 0.05), 0, '#6a4e34'); }
+        for (const yy of [0.5, 0.86]) along(yy, 0.06, 0.05, sd * (W / 2 - 0.05), '#7a5a3c', -h + 0.12, h - 0.12, 10);
       }
+      // the abutments: a few stones each end where the beams rest on the bank
+      for (const sx of [-1, 1]) put(new T.BoxGeometry(0.5, 0.3, W + 0.1), sx * (h + 0.1), b.y0 - 0.2, 0, 0, '#8a8478');
       const m = new T.Mesh(RC.mergeParts(T, parts, woodUV), woodMat); m.castShadow = m.receiveShadow = true; g.add(m);
       return g;
     }

@@ -12,6 +12,12 @@
     // the sim's view of the map: blocked cells, solid circles, things you can use
     plan(realm, terrain) {
       const W = realm.w, H = realm.h, blocked = new Uint8Array(W * H), circles = [], usable = [];
+      // nothing grows or stands on a bridge or in the brook: shrubs, forage and the like step aside to the nearest dry ground
+      const st = terrain.stream, onDeck = (x, z, p) => st.decks.some((d) => x > d.x0 - p && x < d.x1 + p && z > d.z0 - p && z < d.z1 + p);
+      if (st) for (const t of realm.things) if ((t.kind === 'shrub' || t.kind === 'forage' || t.kind === 'crates' || t.kind === 'sign') && (st.wet(t.x, t.z, 0.35) || onDeck(t.x, t.z, 0.5))) {
+        let best = null; for (let r = 0.6; r < 5 && !best; r += 0.3) for (let a = 0; a < 6.28 && !best; a += 0.4) { const x = t.x + Math.cos(a) * r, z = t.z + Math.sin(a) * r; if (!st.wet(x, z, 0.4) && !onDeck(x, z, 0.6)) best = [x, z]; }
+        if (best) { t.x = best[0]; t.z = best[1]; }
+      }
       for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) { const k = terrain.paint[r][c]; if (k === '~' || k === 'T' || k === 'L') blocked[r * W + c] = 1; }
       for (const t of realm.things) {
         if (t.kind === 'building') { for (let r = Math.floor(t.z + 0.5); r < t.z + t.d - 0.3; r++) for (let c = t.x; c < t.x + t.w; c++) if (r >= 0 && r < H && c >= 0 && c < W) blocked[r * W + c] = 1; if (t.door) usable.push({ kind: 'door', thing: t, x: t.door.x, z: t.door.z + 0.6, verb: 'Enter', name: t.name }); continue; }
@@ -94,7 +100,7 @@
           const beam = (z0, y0, z1, y1, wd = 0.12) => { const L = Math.hypot(z1 - z0, y1 - y0), bm2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, L, wd), beamM); bm2.rotation.x = Math.atan2(z1 - z0, y1 - y0); bm2.position.set(gx, (y0 + y1) / 2, (z0 + z1) / 2); o.add(bm2); };
           const hw2 = half - 0.1, cy = h * 0.42, cz = hw2 * (1 - cy / h) - 0.04;
           beam(0, 0, 0, h - 0.08, 0.14); beam(-cz, cy, cz, cy); beam(-hw2 * 0.62, 0.04, -0.07, cy * 0.92); beam(hw2 * 0.62, 0.04, 0.07, cy * 0.92);
-          const rl = Math.hypot(half, h); for (const k of [-1, 1]) { const bb = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, rl + 0.3), beamM); bb.rotation.x = -k * Math.atan2(h, half); bb.position.set(s * (w / 2 - 0.1 + 0.06), h / 2 - 0.06, k * half / 2); o.add(bb); }
+          for (const k of [-1, 1]) { const bb = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.2, Ls), beamM); bb.rotation.x = k * ang; bb.position.set(s * (L / 2 - 0.03), h - (run / 2) * Math.tan(ang) - 0.1, k * run / 2); o.add(bb); }   // barge boards: under the roof's edge, the same slope and length as the roof
         }   // the gable ends
         const ridge = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, L, 10, 1, false, 0, Math.PI), M(tint, { roughness: 0.7 })); ridge.rotation.z = Math.PI / 2; ridge.rotation.y = 0; ridge.position.y = h + 0.03; o.add(ridge);
         o.traverse((x) => { if (x.isMesh) { x.castShadow = true; x.receiveShadow = true; } });
@@ -165,7 +171,7 @@
           g2.computeVertexNormals(); const m = new THREE.Mesh(g2, GRANM); m.position.set(dx, top - hh, (z0 + z1) / 2); m.castShadow = m.receiveShadow = true; grp.add(m); };
         stepT(1.5, FT, front - 0.02, front + REV + 0.36);   // the top step, under the door and out past the frame
         stepT(1.85, FT / 2, front + REV + 0.36, front + REV + 0.72);
-        const hood = rB() < 0.55;
+        const hood = !st.columns && rB() < 0.55;   // (a porch has its own roof)
         if (hood) {   // a small pent hood over the door: boards sloping away from the wall, an edge board, and two straight struts back to the wall
           const hm = roofM.clone(); if (hm.map) { hm.map = roofM.map.clone(); hm.map.needsUpdate = true; hm.map.repeat.set(1.9 / rt.m, 0.9 / rt.m); } if (hm.normalMap) { hm.normalMap = roofM.normalMap.clone(); hm.normalMap.needsUpdate = true; hm.normalMap.repeat.set(1.9 / rt.m, 0.9 / rt.m); }
           const hw = 1.9, hd = 0.95, hy = FT + DH + 0.44, hr = new THREE.Mesh(new THREE.BoxGeometry(hw, 0.07, hd), hm), tilt = 0.32;
@@ -193,8 +199,21 @@
         };
         for (let i = 0; i < Math.floor(W / 2.2); i++) { const wx = -W / 2 + 1.1 + i * 2.2; if (Math.abs(wx - dx) < 1.2) continue; win(wx, 0.9); if (st.h > 3.2) win(wx, 2.4); }
         if (st.tower) { const tw = cyl(1.1, 1.1, st.h + 2.2, wallM, 14, W / 2 - 0.6, 0, -D / 2 + 0.8); grp.add(tw); const cone = new THREE.Mesh(new THREE.ConeGeometry(1.45, 1.8, 14), roofM); cone.position.set(W / 2 - 0.6, st.h + 3.1, -D / 2 + 0.8); grp.add(cone); grp.add(box(0.5, 0.5, 0.1, mats.glass, W / 2 - 0.6, st.h + 1.2, -D / 2 + 1.91)); }
-        if (st.columns) { const sm = WT.darkstone.map ? M('#efe8dc', { map: rep(WT.darkstone.map, 0.6, st.h / 2.4), normalMap: rep(WT.darkstone.normalMap, 0.6, st.h / 2.4), roughness: 0.9 }) : M('#e8e2d4');
-          for (let i = 0; i < 4; i++) { const px = -W / 2 + 1 + i * ((W - 2) / 3); grp.add(box(0.62, 0.22, 0.62, sm, px, 0, front + 0.55)); grp.add(cyl(0.22, 0.26, st.h - 0.5, sm, 14, px, 0.22, front + 0.55)); grp.add(box(0.6, 0.28, 0.6, sm, px, st.h - 0.28, front + 0.55)); } }
+        let porchBeam = null;
+        if (st.columns) {   // a porch: columns between the door and the windows (never in front of them), a beam on their heads, a tiled lean-to roof back to the wall
+          const sm = WT.darkstone.map ? M('#efe8dc', { map: rep(WT.darkstone.map, 0.6, 1.2), normalMap: rep(WT.darkstone.normalMap, 0.6, 1.2), roughness: 0.9 }) : M('#e8e2d4');
+          const opens = [dx]; for (let i = 0; i < Math.floor(W / 2.2); i++) { const wx = -W / 2 + 1.1 + i * 2.2; if (Math.abs(wx - dx) >= 1.2) opens.push(wx); } opens.sort((a, b) => a - b);
+          const cols = [-W / 2 + 0.35]; for (let i = 0; i < opens.length - 1; i++) cols.push((opens[i] + opens[i + 1]) / 2); cols.push(W / 2 - 0.35);
+          const CH = Math.min(st.h - 0.9, 2.75), PD = 1.7, cz = front + PD - 0.25;
+          for (const px of cols) { grp.add(box(0.5, 0.2, 0.5, sm, px, 0, cz)); grp.add(cyl(0.17, 0.2, CH - 0.42, sm, 14, px, 0.2, cz)); grp.add(box(0.46, 0.22, 0.46, sm, px, CH - 0.22, cz)); }
+          grp.add(box(W + 0.3, 0.26, 0.34, beamM, 0, CH, cz));   // the beam across the column heads
+          porchBeam = { y: CH, z: cz };
+          const rise = 0.55, run = PD + 0.15, ang = Math.atan2(rise, run), Lr = Math.hypot(rise, run) + 0.25;
+          const pm = roofM.clone(); if (pm.map) { pm.map = roofM.map.clone(); pm.map.needsUpdate = true; pm.map.repeat.set((W + 0.6) / rt.m, Lr / rt.m); } if (pm.normalMap) { pm.normalMap = roofM.normalMap.clone(); pm.normalMap.needsUpdate = true; pm.normalMap.repeat.set((W + 0.6) / rt.m, Lr / rt.m); }
+          const pr = new THREE.Mesh(new THREE.BoxGeometry(W + 0.6, 0.08, Lr), pm); pr.rotation.x = ang; pr.position.set(0, CH + 0.26 + rise / 2 - 0.05, front + run / 2 + 0.08); pr.castShadow = true; grp.add(pr); fadeMats.push(pm);
+          grp.add(box(W + 0.6, 0.14, 0.08, beamM, 0, CH + 0.26 + rise - 0.06, front + 0.04));   // where it meets the wall: a ledger board
+          for (const px of cols) { const rf = box(0.08, 0.12, run + 0.2, beamM, px, CH + 0.26, front + run / 2); rf.rotation.x = ang; grp.add(rf); }   // rafters over each column
+        }
         if (st.wing) { const wg = box(3.2, st.h - 0.8, D * 0.6, wallM, W / 2 + 1.4, 0, -D * 0.15); grp.add(wg); const wr = roof(D * 0.6, 3.2, 1.3, roofM, gableM, rt, ridgeTint); wr.rotation.y = Math.PI / 2; wr.position.set(W / 2 + 1.4, st.h - 0.8, -D * 0.15); grp.add(wr); fadeMats.push(...wr.userData.mats); }
         if (st.glasshouse) {   // a glasshouse on the side: a low brick wall, white-painted glazing bars, small panes, a glass roof with a ridge, plants inside on staging and in pots
           const GW = 2.6, GD = D * 0.72, GH = 2.0, RH = 0.9, gx = -W / 2 - GW / 2 - 0.02, base = 0.5, bars = M('#eeeae0', { roughness: 0.6 });
@@ -238,6 +257,10 @@
             grp.add(bg);
           });
         }
+        if (porchBeam) {   // on a porch: the board hangs from the beam on two chains, beside the door
+          const sx = dx + (dx > 0 ? -1.15 : 1.15), BW = 0.78, BH = 0.5; for (const o of [-BW / 2 + 0.08, BW / 2 - 0.08]) grp.add(box(0.012, 0.22, 0.012, mats.iron, sx + o, porchBeam.y - 0.22, porchBeam.z));
+          const sb = RC.Signs.board(THREE, RC.Signs.shopTexture(THREE, b.name, b.style, seedB), BW, BH, 0.05, frameM); sb.rotation.y = Math.PI / 2; sb.position.set(sx, porchBeam.y - 0.22 - BH / 2, porchBeam.z); grp.add(sb);
+        } else
         // hanging sign: an iron arm out from the front wall towards the street, a diagonal brace under it, the board on two chains and turned to face along the path so it reads from either side
         { const sd2 = dx > 0 ? -1 : 1, lim = W / 2 - 0.5, sx = Math.max(-lim, Math.min(lim, dx + sd2 * 2.3)), ay = st.h - 0.55, ln = 1.15, az0 = front + 0.02;
           // the bracket: a plate on the wall, the arm straight out from it, a diagonal brace from lower on the wall up to the arm's middle, a curl of iron between them
@@ -460,6 +483,18 @@
       };
       for (const t of realm.things) {
         if (t.kind === 'building' || !make[t.kind]) continue;
+        const st = terrain.stream;
+        // a chest in the water sits on a flat rock, with stepping stones out to it from the nearest bank
+        if (st && t.kind === 'chest' && st.wet(t.x, t.z, 0.1)) {
+          const d0 = st.find(t.x, t.z), i0 = st._i, wl = st.WL[i0], top = wl + 0.12, rockM = M('#8a8a80', { map: GRAN.map, normalMap: GRAN.normalMap, roughness: 0.8 });
+          const rk = new THREE.Mesh(RC.roughBox(THREE, 1.1, 0.5, 0.9, 0.08, RC.rng(t.x * 3)), rockM); rk.position.set(t.x, top - 0.25, t.z); rk.castShadow = rk.receiveShadow = true; g.add(rk);
+          st.addStep(t.x, t.z, 0.5, top);
+          // the way out: from the rock toward the closest dry ground, a stone every 0.6 m or so
+          let bx = null, bz = null; for (let r = 0.6; r < 8 && bx == null; r += 0.2) for (let a = 0; a < 6.28; a += 0.2) { const x = t.x + Math.cos(a) * r, z = t.z + Math.sin(a) * r; if (!st.wet(x, z, 0.15)) { bx = x; bz = z; break; } }
+          if (bx != null) { const L = Math.hypot(bx - t.x, bz - t.z), n = Math.max(1, Math.round((L - 0.4) / 0.62));
+            for (let k = 1; k <= n; k++) { const f = (k / (n + 0.6)), x = t.x + (bx - t.x) * f + (RC.hash(k, t.x, 3) - 0.5) * 0.18, z = t.z + (bz - t.z) * f + (RC.hash(k, t.z, 4) - 0.5) * 0.18, sy = wl + 0.07;
+              const s = new THREE.Mesh(RC.roughBox(THREE, 0.46, 0.3, 0.42, 0.06, RC.rng(k * 7 + t.x)), rockM); s.position.set(x, sy - 0.15, z); s.rotation.y = RC.hash(k, 9, 1) * 3; s.castShadow = s.receiveShadow = true; g.add(s); st.addStep(x, z, 0.26, sy); } }
+        }
         const o = make[t.kind](t); o.userData.thing = t;
         if (t.kind === 'boat') { o.position.set(t.x, terrain.waterY, t.z); o.traverse((m) => { if (m.isMesh) m.castShadow = true; }); g.add(o); const ph = RC.hash(t.x, t.z, 1) * 6; tickers.push((tm2) => { o.position.y = terrain.waterY - 0.05 + Math.sin(tm2 * 1.3 + ph) * 0.06; o.rotation.z = Math.sin(tm2 * 1.1 + ph) * 0.04; }); continue; }
         add(o, t.x, t.z, t.kind === 'sign' || t.kind === 'noticeboard' ? 0 : 0);

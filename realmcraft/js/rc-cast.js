@@ -113,7 +113,7 @@
           if (s.talking) { add('Head', Math.sin(t * 5) * 0.05); add('RArm1Sh', -0.3 + Math.sin(t * 3) * 0.15); add('RArm1El', -0.5); }
           if (f.baby) { add('RArm1Sh', -0.6); add('LArm1Sh', -0.6); add('RArm1El', -1.1); add('LArm1El', -1.1); f.baby.rotation.z = Math.sin(t * 1.5) * 0.08; }
           if (f.cape) f.cape.rotation.x = 0.12 + s.moving * 0.35 + Math.sin(t * 2.3 + s.phase) * 0.04;
-          if (f.head) { const near = s.ring !== 'far'; if (f.head.near !== near) { f.head.near = near; for (const d of [...(f.head.detail || []), ...(f.small || [])]) d.visible = near; } if (near) f.head.update(t); }
+          if (f.head) { const near = s.ring !== 'far'; if (f.head.near !== near) { f.head.near = near; for (const d of [...(f.head.detail || []), ...(f.small || [])]) d.visible = near; f.setNear(near); } if (near) f.head.update(t); }
         },
       };
     },

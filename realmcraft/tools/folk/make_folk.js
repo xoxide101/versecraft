@@ -115,7 +115,11 @@ const BODIES = {
 function build(name, keep) {
   const spec = Object.assign(human(Object.assign({ name }, BODIES[name])), { embed_spec: false });
   require(E + 'relative.js').resolveJoints(spec);
-  const sk = buildSkeleton(spec), meshes = compile(spec);
+  const sk = buildSkeleton(spec);
+  // the engine hangs a mirrored chain on the same host as its left twin (fine on the body's centre line); a right foot must hang
+  // on the right ankle, not the left one: move every R joint whose parent is an L joint onto that joint's R twin
+  for (const jn of sk.joints) { if (!jn.name.startsWith('R') || jn.parent < 0) continue; const pn = sk.joints[jn.parent].name; if (pn.startsWith('L') && sk.index['R' + pn.slice(1)] != null) jn.parent = sk.index['R' + pn.slice(1)]; }
+  const meshes = compile(spec);
   const info = drainInfo();
   const { fails, warns } = runChecks(spec, sk, meshes, null);
   for (const f of fails) console.log(`  [${name}] check: ${f}`);   // (creature rules: read, not obeyed blindly — people are not attack-ready beasts)

@@ -94,12 +94,12 @@
     // a person's body: returns { root, bones, mixer, actions, ready } — the root can be placed at once; the body arrives when loaded
     make(def, look, isPlayer) {
       const root = new THREE.Group(), name = RC.Folk.bodyFor(def, isPlayer), seed = RC.hash((def.id || 'p').length * 3.1, (def.id || 'p').charCodeAt(1) || 7, 11);
-      const out = { root, name, bones: {}, mixer: null, actions: {}, ready: false, small: [] };
+      const out = { root, name, bones: {}, mixer: null, actions: {}, ready: false, small: [], bodyMeshes: [], setNear(n) { for (const o of this.bodyMeshes) o.material = n ? o.userData.near : o.userData.far; } };
       RC.Folk.load(name).then((gltf) => {
         const body = skinnedClone(gltf.scene); body.rotation.y = 0; root.add(body);
         const pick = (a, k) => a[Math.floor(RC.hash(seed * 100, k, 3) * a.length) % a.length];
         const elder = /elder/.test(name);
-        const C = { skin: new THREE.Color(look.skin || pick(SKIN, 1)), hair: new THREE.Color(elder ? pick(GREY, 2) : look.hair && !/^#e2e8f0$/i.test(look.hair) ? cloth(look.hair, 0.2) : pick(HAIR, 2)),
+        const C = { skin: new THREE.Color((look = look || {}).skin || pick(SKIN, 1)), hair: new THREE.Color(elder ? pick(GREY, 2) : look.hair && !/^#e2e8f0$/i.test(look.hair) ? cloth(look.hair, 0.2) : pick(HAIR, 2)),
           shirt: look.tunic ? cloth(look.tunic, 0.45) : new THREE.Color('#d8cfbe'), coat: isPlayer ? cloth(look.tunic || '#2a3a5a', 0.35).multiplyScalar(0.9) : new THREE.Color('#5a3a28'), dress: look.tunic ? cloth(look.tunic, 0.4) : new THREE.Color('#6a7a8c'),
           trousers: new THREE.Color(pick(['#4a4038', '#3e3a36', '#5a5040', '#38404a', '#5a4a3a'], 4)), apron: new THREE.Color(pick(['#e8e0d0', '#d8ccb4', '#c8b8a0'], 5)), boots: new THREE.Color(pick(['#3a2818', '#2a1e16', '#4a3422'], 6)) };
         if (/stout/.test(name) && (def.job === 'hammer')) C.apron = new THREE.Color('#5a3a22');   // the smith's leather apron
@@ -108,7 +108,8 @@
           if (!o.isMesh) return; o.castShadow = true; o.receiveShadow = true; o.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.9, 0), 1.3); o.frustumCulled = true;
           const mats = Array.isArray(o.material) ? o.material : [o.material];
           const nm = mats.map((m) => { const c = m.clone(); if (C[m.name]) c.color.copy(C[m.name]); c.roughness = m.name === 'skin' ? 0.55 : m.name === 'eye' ? 0.15 : m.name === 'boots' ? 0.6 : 0.88; c.vertexColors = true; return clothe(c, m.name); });
-          o.material = Array.isArray(o.material) ? nm : nm[0];
+          const plain = mats.map((m) => { const c = m.clone(); if (C[m.name]) c.color.copy(C[m.name]); c.roughness = m.name === 'skin' ? 0.55 : 0.85; c.vertexColors = true; return c; });   // (far away: plain colours, no cloth shader)
+          o.userData.near = Array.isArray(o.material) ? nm : nm[0]; o.userData.far = Array.isArray(o.material) ? plain : plain[0]; o.material = o.userData.far; out.bodyMeshes.push(o);
         });
         // ---- the head (rc-folkhead.js) on the Head bone, and the clothes' details on the body
         const T = THREE, B = out.bones, man = /^man|elder_m|boy|hero/.test(name), fem = !man, kid = /boy|girl/.test(name), job = def.job || '';

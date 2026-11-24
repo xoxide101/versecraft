@@ -41,6 +41,8 @@
       if (I.hit('t')) { this.calendar.add(3); const n = this.calendar.now(); this.say(`${n.weekdayName} · ${this.calendar.clock()} (${n.period})`, 2); }
       if (I.hit('g')) { this.setWeather(WEATHER[(WEATHER.indexOf(this.weather) + 1) % WEATHER.length]); }
       this.calendar.step(dt); this.stepWeather(dt); RC.weatherStep(this.lying, this, dt);
+      this.playT = (this.playT || 0) + dt;
+      if (this.regrowing && this.regrowing.length) this.regrowing = this.regrowing.filter((t) => { if (this.playT < t.regrowAt) return true; t.done = false; if (t._obj) { if (t.node === 'mushroom') t._obj.visible = true; for (const m of t._fruit || []) m.visible = true; } return false; });
       if (this.toast && (this.toast.t -= dt) <= 0) this.toast = null;
       this.shake = Math.max(0, this.shake - dt * 2);
       // ---- talking: Space moves on, Esc stops
@@ -105,7 +107,8 @@
         return;
       }
       if (u.kind === 'chest') { t.done = true; if (t._obj) { const lid = t._obj.getObjectByName('lid'); if (lid && lid.userData.hinge) lid.rotation.x = -1.9; else if (lid) { lid.rotation.x = -1.2; lid.position.z -= 0.15; lid.position.y += 0.15; } } if (/gold/i.test(t.reward)) pl.gold += t.amount || 50; else pl.bag[t.reward] = (pl.bag[t.reward] || 0) + 1; this.say(`The chest holds: ${t.reward}${t.amount ? ' ×' + t.amount : ''}.`); return; }
-      if (u.kind === 'forage') { t.done = true; if (t._obj) { if (t.node === 'mushroom') t._obj.visible = false; else t._obj.scale.setScalar(0.5); } pl.bag[t.name] = (pl.bag[t.name] || 0) + (t.amount || 1); this.say(`Gathered ${t.name} ×${t.amount || 1}${t.use ? ' (' + t.use + ')' : ''}.`); return; }
+      if (u.kind === 'forage') { t.done = true; if (t._obj) { if (t.node === 'mushroom') t._obj.visible = false; else if (t.node !== 'beehive_log') { const hide = []; t._obj.traverse((m) => { if (m.isMesh && !m.isInstancedMesh) { if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere(); if (m.geometry.boundingSphere.radius * Math.max(m.scale.x, m.scale.y, m.scale.z) < 0.17 && m.visible) hide.push(m); } }); for (const m of hide) m.visible = false; t._fruit = hide; } }
+        t.regrowAt = (this.playT || 0) + (/ore|crystal|metal/i.test(t.node || t.name || '') ? 600 : 240); (this.regrowing = this.regrowing || []).push(t);   /* (berries, herbs and mushrooms come back in four minutes; ore in ten) */ pl.bag[t.name] = (pl.bag[t.name] || 0) + (t.amount || 1); this.say(`Gathered ${t.name} ×${t.amount || 1}${t.use ? ' (' + t.use + ')' : ''}.`); return; }
       if (u.kind === 'station') { this.dialogue = { who: { x: t.x, z: t.z }, name: t.title, lines: [t.subtitle, 'Crafting here comes in a later step: what you gather goes in your bag for now.'], i: 0 }; return; }
       if (u.kind === 'bell') { this.shake = 0.3; this.say('DONG… the bell rings out over the harbor.'); return; }
       this.dialogue = { who: { x: t.x, z: t.z }, name: t.title || u.name, lines: t.lines && t.lines.length ? t.lines : ['Nothing more to see.'], i: 0 };
