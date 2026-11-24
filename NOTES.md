@@ -74,3 +74,6 @@ and bends stems by an angle (tall ones swing, tufts barely stir); rain weighs ti
 ## Open-source finds (licences checked)
 MIT (code usable): ez-tree (procedural trees for three.js), anyCreature (text → rigged, animated GLB creatures, made for AI sessions),
 SpatialTrees (C# quadtrees/octrees: the idea for detail rings and "what's near"). AGPL-3.0 (ideas only): Citybound, Kuso-Physics.
+
+## Art direction (2026-11-23)
+Photorealistic where we can. The paths lab is the gauge: real scanned materials (Poly Haven, CC0) with depth, gap shading and roughness. Everything new is judged against it.
