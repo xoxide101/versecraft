@@ -18,7 +18,7 @@
       return out;
     },
     build(T, terrain, shared) {
-      const g = new T.Group(), decks = [], DECK = 0.42, RAMP = 1.4, ONLAND = 2.6;
+      const g = new T.Group(), decks = [], DECK = 0.42, RAMP = 3.6, ONLAND = 4.4;
       const real = RC.Tex.real(T, 'planks_weathered'), M = (c, o) => new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.9 }, o || {}));
       // boards: one shared box; each instance shows a different strip of the wood picture (offset by its number)
       const boardMat = real ? M('#ffffff', { map: real.map, normalMap: real.normalMap, normalScale: new T.Vector2(1.2, 1.2) }) : M('#8a6440');

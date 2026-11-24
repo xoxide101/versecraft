@@ -28,7 +28,7 @@
   // the ambient-occlusion pass draws everything as solid; leaf and grass cards are see-through, so leave them out of it
   RC.aoSkipCutouts = (pass) => {
     const base = pass._overrideVisibility.bind(pass);
-    pass._overrideVisibility = function () { base(); const cache = this._visibilityCache; this.scene.traverse((o) => { if (o.isMesh && o.visible && o.material && (o.material.alphaTest > 0 || o.material.transparent)) { o.visible = false; cache.push(o); } }); };
+    pass._overrideVisibility = function () { base(); const cache = this._visibilityCache; this.scene.traverse((o) => { if ((o.isMesh || o.isSprite) && o.visible && o.material && (o.material.alphaTest > 0 || o.material.transparent)) { o.visible = false; cache.push(o); } }); };
     return pass;
   };
 

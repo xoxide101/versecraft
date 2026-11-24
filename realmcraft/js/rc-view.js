@@ -5,9 +5,9 @@
   const RC = window.RC;
   const VIEWS = { close: { dist: 14.2, elev: 0.54, label: 'CLOSE' }, evo: { dist: 26.5, elev: 0.64, label: 'EVO 2.5D' }, wide: { dist: 42, elev: 0.69, label: 'WIDE' }, map: { dist: 0, elev: 0.74, label: 'WHOLE MAP' } };
   RC.VIEWS = VIEWS;
-  const SKY = [   // [fraction of the day, sky colour, sun light, ambient]
-    [0.0, '#0b1230', 0.05, 0.35], [0.2, '#1c2547', 0.08, 0.4], [0.25, '#f2a65a', 0.6, 0.55], [0.33, '#9fd0ff', 1.6, 0.85],
-    [0.6, '#8ec5ff', 1.8, 0.9], [0.78, '#f59e6b', 0.9, 0.6], [0.86, '#2a2f5c', 0.15, 0.42], [1.0, '#0b1230', 0.05, 0.35]];
+  const SKY = [   // [fraction of the day, sky colour, sun light, ambient]: dawn and dusk each take a good while, passing through several colours
+    [0.0, '#0b1230', 0.05, 0.35], [0.17, '#0f1636', 0.06, 0.37], [0.22, '#3a3a66', 0.2, 0.45], [0.26, '#f2a65a', 0.6, 0.55], [0.34, '#9fd0ff', 1.6, 0.85],
+    [0.6, '#8ec5ff', 1.8, 0.9], [0.7, '#d7b894', 1.3, 0.75], [0.78, '#f59e6b', 0.9, 0.6], [0.84, '#8a5a78', 0.45, 0.5], [0.9, '#2a2f5c', 0.15, 0.42], [0.96, '#121838', 0.07, 0.37], [1.0, '#0b1230', 0.05, 0.35]];
 
   RC.View = class {
     constructor(THREE, host, realm, sim) {
@@ -32,6 +32,7 @@
       // the land and what's on it (the ground cover first: it tells the ground picture what's tended and what's worn)
       this.cover = new RC.GroundCover(THREE, realm, sim.terrain, sim.plan, this.shared);
       this.scene.add(sim.terrain.build(THREE));
+      { const wm = this.scene.getObjectByName('water'); if (wm) wm.material = RC.Water.material(THREE, sim.terrain, this.shared, realm); this.water = RC.Water.life(THREE, realm, sim.terrain, this.shared); this.scene.add(this.water.group); }   // (rc-water.js)
       const map = RC.MapCraft.build(THREE, realm, sim.terrain, this.shared);
       this.scene.add(map.group); this.labels = map.labels; this.tickers = map.tickers; this.buildings = map.buildings;
       this.scene.add(this.cover.group);   // grasses, reeds, wildflowers (rc-groundcover.js)
@@ -101,8 +102,11 @@
       const sa = (f - 0.25) * Math.PI * 2;   // sun's path: rises in the east at dawn
       // which real sky lights the scene: weather first, then the time of day
       const mood = grey > 0.25 ? 'overcast' : this.night > 0.75 ? 'night' : f < 0.3 ? 'sunset' : f > 0.8 ? 'dusk' : f > 0.73 ? 'sunset' : 'day';
-      if (mood !== this.envMood && this.envs[mood]) { this.envMood = mood; this.scene.environment = this.envs[mood]; }
-      const hasEnv = !!this.scene.environment; this.scene.environmentIntensity = hasEnv ? RC.lerp(0.12, 0.5, RC.clamp(sunI / 1.8, 0, 1)) * (1 - grey * 0.55) : 0;   // (the sky's light follows the sun's strength: warm and low at sunset, faint at night)
+      // (a new sky light fades the old one out, swaps, and fades back in: no pop)
+      if (this.envMood == null && this.envs[mood]) { this.envMood = mood; this.scene.environment = this.envs[mood]; this.envFade = 1; }
+      else if (mood !== this.envMood && this.envs[mood]) { this.envFade = RC.damp(this.envFade == null ? 1 : this.envFade, 0, 3, dt); if (this.envFade < 0.04) { this.envMood = mood; this.scene.environment = this.envs[mood]; } }
+      else this.envFade = RC.damp(this.envFade == null ? 1 : this.envFade, 1, 3, dt);
+      const hasEnv = !!this.scene.environment; this.scene.environmentIntensity = hasEnv ? RC.lerp(0.12, 0.5, RC.clamp(sunI / 1.8, 0, 1)) * (1 - grey * 0.55) * (this.envFade == null ? 1 : this.envFade) : 0;   // (the sky's light follows the sun's strength: warm and low at sunset, faint at night)
       this.sun.intensity = sunI; this.hemi.intensity = hasEnv ? amb * 0.35 : amb; this.sun.color.set(f < 0.3 || f > 0.75 ? '#ffc58a' : '#fff4e0');
       // ---- camera
       const v = VIEWS[sim.viewMode] || VIEWS.evo, talk = sim.dialogue && sim.dialogue.who;
@@ -137,14 +141,14 @@
       this.rain.material.opacity = 0.25 + pr * 0.3;
       if (this.rain.visible) { this.rain.position.set(c.x, c.y, c.z); const p = this.rain.geometry.attributes.position; for (let j = 0; j < p.count; j += 2) { let y = p.getY(j) - dt * (17 + pr * 9); if (y < 0) y += 25; p.setY(j, y); p.setY(j + 1, y - 0.5); p.setX(j + 1, p.getX(j) + this.shared.uWind.value.x * 0.35); p.setZ(j + 1, p.getZ(j) + this.shared.uWind.value.y * 0.35); } p.needsUpdate = true; }
       if (this.snow.visible) { this.snow.position.set(c.x, c.y, c.z); const p = this.snow.geometry.attributes.position; for (let j = 0; j < p.count; j++) { let y = p.getY(j) - dt * 1.6; if (y < 0) y += 25; p.setY(j, y); p.setX(j, p.getX(j) + Math.sin(t + j) * dt * 0.3); } p.needsUpdate = true; }
-      sim.terrain.waterTex.offset.set(t * 0.012, t * 0.02);
+      sim.terrain.waterTex.offset.set(Math.sin(t * 0.07) * 0.01, t * 0.016);   // the sea drifts steadily one way (toward the shore) with a slight sway
       // ---- the cast
       for (const [p, rg] of this.rigs) {
         rg.root.visible = !p.hidden;
         rg.root.position.set(p.x, sim.terrain.groundY(p.x, p.z), p.z); rg.root.rotation.y = Math.PI / 2 - p.angle;
         if (p.ring !== 'far' || (this.frameN = (this.frameN || 0) + 1) % 4 === 0) rg.update(p, t);   // detail rings: far bodies animate less often
       }
-      this.cover.update(pl.x, pl.z); this.horizon.update(this.scene.fog.color, this.night);
+      this.cover.update(pl.x, pl.z); if (this.water) this.water.update(dt, t, pl.x, pl.z); this.horizon.update(this.scene.fog.color, this.night);
       if (this.coverWx !== this.cover.group.children.length) { this.coverWx = this.cover.group.children.length; RC.weatherize(this.cover.group, this.shared); }   // (new grass chunks too)
       this.shared.uWet.value = sim.lying.wet; this.shared.uSnow.value = sim.lying.snow;
       this.shared.uRain.value = RC.damp(this.shared.uRain.value, sim.precip != null ? sim.precip : sim.weather === 'storm' ? 1 : sim.weather === 'rain' ? 0.7 : 0, 0.5, dt);

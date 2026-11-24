@@ -24,6 +24,15 @@
       vec2 P = vec2(u, y);
       float lum = dot(diffuseColor.rgb, vec3(0.33));
       float h = lum * (uAgKind > 0.5 ? 0.9 : 0.35);   // the picture's own light and dark as height (stones and grain stand out)
+      if (uAgKind > 2.5) {   // a roof: moss cushions in the laps of the tiles, yellow-grey lichen spots, darker and greener toward the eaves
+        float eave = 1.0 - smoothstep(0.0, 1.4, y), cush = smoothstep(0.64, 0.8, agF(vAgW.xz * 1.6 + uAgSeed)) * (0.25 + eave * 0.6) * smoothstep(0.25, 0.45, 1.0 - lum);
+        float lich = smoothstep(0.88, 0.93, agN(vAgW.xz * 11.0 + 5.0)) * smoothstep(0.55, 0.7, agF(vAgW.xz * 0.5 + 9.0));
+        diffuseColor.rgb *= 0.88 + agF(vAgW.xz * 0.4 + uAgSeed) * 0.24;
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.26, 0.1) * (0.8 + lum * 0.4), clamp(cush, 0.0, 0.7));
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.05, 1.1, 0.8) + vec3(0.05, 0.05, 0.0), lich * 0.5);
+        diffuseColor.rgb *= 1.0 - eave * 0.12; h += cush * 0.6 + lich * 0.2;
+        normal = agBump(-vViewPosition, normal, h * 0.012, faceDirection);
+      } else {
       float blot = agF(P * 0.35 + uAgSeed);
       diffuseColor.rgb *= 0.9 + blot * 0.2;   // uneven colour: patches of sun-fade and old repairs
       // cracks: thin and branching, only in some stretches, more round the corners of openings and low down
@@ -49,7 +58,9 @@
       float rise = 0.35 + agF(vec2(u * 0.7, 3.0)) * 0.7, damp = (1.0 - smoothstep(0.0, rise, y)) * side;
       diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.66, 0.64, 0.56), damp * 0.5);
       float moss = (1.0 - smoothstep(0.0, 0.22 + agN(vec2(u * 2.0, 1.0)) * 0.2, y)) * smoothstep(0.35, 0.6, agF(P * 1.7 + 2.0));
+      float mossW = smoothstep(0.42, 0.7, agF(P * vec2(0.9, 0.7) + 40.0 + uAgSeed)) * smoothstep(0.5, 0.75, agF(P * 2.6 + 3.0)) * (0.55 + 0.45 * smoothstep(0.0, 1.2, y)) * (uAgKind > 0.5 && uAgKind < 1.5 ? 1.0 : 0.35);   // patches creeping up stone and the shaded side walls
       moss = max(moss * side, smoothstep(0.6, 0.9, wn.y) * smoothstep(0.55, 0.75, agF(vAgW.xz * 2.0)) * 0.8);   // and on what faces up (sills, plinths)
+      moss = max(moss, mossW * side * 0.8);
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.27, 0.11) * (0.7 + lum * 0.5), moss * 0.85); h += moss * 0.25;
       // rain streaks: thin dark runs down from under the eaves and sills, fading lower down
       float st = agN(vec2(u * 7.0, y * 0.18 + uAgSeed)) * agN(vec2(u * 2.3 + 4.0, y * 0.1));
@@ -57,6 +68,7 @@
       diffuseColor.rgb *= 1.0 - streak * 0.28;
       roughnessFactor = mix(roughnessFactor, 1.0, loss * 0.5 + cr * 0.5);
       normal = agBump(-vViewPosition, normal, h * 0.012, faceDirection);
+      }
     }`;
   const tex = {};
   // age a material in place. opt: { kind, base (world y of the wall's foot), top (where the eaves are), seed, brick (texture under the plaster, metres) }
@@ -157,7 +169,18 @@
         for (let p = 0; p < 5; p++) leaf(x + Math.cos(p * 1.26) * 0.012, y, z + Math.sin(p * 1.26) * 0.012, 0.028, -1.2, p * 1.26, c); }
       const mesh = new T.Mesh(RC.mergeParts(T, parts), RC.Aging.leafMat(T)); mesh.castShadow = true; g.add(mesh); return g;
     },
-    leafMat(T) { return tex.leaf || (tex.leaf = new T.MeshStandardMaterial({ vertexColors: true, side: T.DoubleSide, roughness: 0.6 })); },
+    leafMat(T) { return tex.leaf || (tex.leaf = RC.Aging.stir(new T.MeshStandardMaterial({ vertexColors: true, side: T.DoubleSide, roughness: 0.6 }), 'y')); },
+    // leaves flutter: each moves on its own (the phase comes from where it is), more with the wind; stems close to the wall hardly move
+    stir(m, axis) {
+      const S = RC.Aging.shared; if (!S) return m;
+      m.onBeforeCompile = (sh) => { sh.uniforms.uTime = S.uTime; sh.uniforms.uWind = S.uWind;
+        sh.vertexShader = 'uniform float uTime; uniform vec3 uWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+          vec3 wp0 = (modelMatrix * vec4(position, 1.0)).xyz; float gust = 0.5 + 0.5 * sin(uTime * 0.7 + wp0.x * 0.3 + wp0.z * 0.2);
+          float free0 = ${axis === 'z' ? 'smoothstep(0.02, 0.05, position.z)' : '(1.0 - smoothstep(0.0, 0.1, position.y)) * 0.6 + 0.4'};
+          float a = free0 * (0.004 + 0.012 * uWind.z * (0.4 + gust));
+          transformed += vec3(sin(uTime * 3.1 + wp0.x * 9.0 + wp0.y * 7.0), sin(uTime * 2.3 + wp0.y * 8.0 + wp0.z * 6.0) * 0.6, cos(uTime * 2.7 + wp0.z * 9.0 + wp0.x * 5.0)) * a;`); };
+      m.customProgramCacheKey = () => 'stir' + axis; return m;
+    },
     // ivy up a wall face (local: the face is the plane z = 0, x across, y up), avoiding openings [x0, y0, x1, y1]
     ivy(T, span, height, holes, seed, roses) {
       const r = rng(seed), parts = [], m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), s = new T.Vector3(), stems = [];
@@ -186,7 +209,7 @@
       const sh = new T.Shape(); sh.moveTo(0, -0.5); sh.quadraticCurveTo(0.55, -0.35, 0.5, 0.05); sh.quadraticCurveTo(0.3, 0.05, 0.25, 0.15); sh.quadraticCurveTo(0.2, 0.5, 0, 0.6); sh.quadraticCurveTo(-0.2, 0.5, -0.25, 0.15); sh.quadraticCurveTo(-0.3, 0.05, -0.5, 0.05); sh.quadraticCurveTo(-0.55, -0.35, 0, -0.5);
       return (tex.ivyG = new T.ShapeGeometry(sh, 3));
     },
-    ivyMat(T) { return tex.ivy || (tex.ivy = new T.MeshStandardMaterial({ vertexColors: true, side: T.DoubleSide, roughness: 0.45 })); },
+    ivyMat(T) { return tex.ivy || (tex.ivy = RC.Aging.stir(new T.MeshStandardMaterial({ vertexColors: true, side: T.DoubleSide, roughness: 0.45 }), 'z')); },
     // a trellis: thin laths crossing diagonally on a frame
     trellis(T, w, h, mat) {   // laths crossing at 45 degrees, each cut to the frame
       const g = new T.Group(), gap = 0.2;
@@ -202,9 +225,10 @@
       g.traverse((o) => { if (o.isMesh) o.castShadow = true; }); return g;
     },
     // weeds and grass at the foot of a wall, along a line (local x across, z out from the wall)
-    weeds(T, span, seed) {
+    weeds(T, span, seed, gap) {   // gap: [x0, x1] left bare (the doorstep)
       const r = rng(seed), pos = [], col = [], c = new T.Color(), greens = ['#4a6a2a', '#5a7a32', '#6a8a3a', '#7a8a4a', '#3a5a22', '#8a8a5a'];
       for (let x = -span / 2; x < span / 2; x += 0.04 + r() * 0.08) {
+        if (gap && x > gap[0] && x < gap[1]) continue;
         const clump = RC.vnoise(x + seed * 30, 0, 0.6, 5); if (clump < 0.35) continue;
         const n = Math.floor(clump * 9);
         for (let i = 0; i < n; i++) { const bx = x + (r() - 0.5) * 0.08, bz = r() * 0.12 + 0.02, hh = 0.05 + r() * 0.22 * clump, a = r() * 6.28, lean = 0.15 + r() * 0.3, wd = 0.006 + r() * 0.008;
@@ -222,9 +246,8 @@
   RC.Mounds = (T, realm, terrain, avoid) => {
     const g = new T.Group(), Tx = (n) => RC.Tex.real(T, n);
     const kinds = [
-      { tex: Tx('dirt') || Tx('dirt_path'), tint: '#b09a82', r: [0.16, 0.3], h: [0.14, 0.26], lump: 0.35, where: (k, kept, worn, x, z) => (k === '.' || k === ',') ? RC.smooth01((RC.vnoise(x, z, 5, 501) - 0.64) / 0.12) * 0.35 * (1 - kept * 0.7) : 0 },   // molehills
-      { tex: Tx('sand'), tint: '#b8a888', r: [0.3, 0.7], h: [0.05, 0.1], lump: 0.15, where: (k, kept, worn) => (k === '.' || k === ',') ? worn * 0.18 * (1 - kept) : 0 },   // sandy heaps by the tracks
-      { tex: Tx('mud_leaves') || Tx('forest_ground'), tint: '#b09c84', r: [0.2, 0.45], h: [0.08, 0.2], lump: 0.3, where: (k, kept, worn, x, z) => (k === ',' || k === 'T') ? RC.smooth01((RC.vnoise(x, z, 4, 503) - 0.55) / 0.2) * 0.22 : 0 },   // earth and old leaves
+      { tex: Tx('dirt') || Tx('dirt_path'), tint: '#e0d0b8', r: [0.12, 0.2], h: [0.05, 0.1], lump: 0.45, where: (k, kept, worn, x, z) => (k === '.' || k === ',') ? RC.smooth01((RC.vnoise(x, z, 3, 501) - 0.82) / 0.08) * 0.08 * (1 - kept * 0.7) : 0 },   // a few low gopher / mole mounds, in little groups
+      { tex: Tx('sand'), tint: '#d8c8a8', r: [0.3, 0.6], h: [0.03, 0.06], lump: 0.15, where: (k, kept, worn) => (k === '.' || k === ',') ? worn * 0.02 * (1 - kept) : 0 },   // the odd sandy heap by the tracks
     ];
     kinds.forEach((K, ki) => {
       const ge = new T.SphereGeometry(1, 16, 7, 0, Math.PI * 2, 0, Math.PI / 2), p = ge.attributes.position;
@@ -244,6 +267,23 @@
         e.set(0, RC.hash(x, z, 542) * 6.28, 0); q.setFromEuler(e); s.set(rr * (0.8 + RC.hash(x, z, 543) * 0.5), hh, rr); v.set(x, terrain.groundY(x, z) - 0.015, z); m4.compose(v, q, s); im.setMatrixAt(i, m4); });
       im.receiveShadow = true; im.castShadow = true; g.add(im);
     });
+    // a few hedgehogs in the rough grass and at the edge of the woods: a spiny brown back, a pale pointed snout
+    { const spots = [];
+      for (let z = 0.5; z < realm.h; z += 0.9) for (let x = 0.5; x < realm.w; x += 0.9) {
+        const jx = x + (RC.hash(x, z, 560) - 0.5) * 0.8, jz = z + (RC.hash(z, x, 561) - 0.5) * 0.8, k = terrain.cell(jx, jz);
+        if ((k === ',' || k === 'T') && !avoid(jx, jz) && RC.hash(jx * 5, jz * 5, 562) < 0.006) spots.push([jx, jz]);
+      }
+      if (spots.length) {
+        const bg = new T.SphereGeometry(1, 14, 9, 0, Math.PI * 2, 0, Math.PI * 0.62), bp = bg.attributes.position;
+        for (let i = 0; i < bp.count; i++) { const sp = 1 + (RC.vnoise(bp.getX(i) * 9, bp.getZ(i) * 9 + bp.getY(i) * 5, 1, 570) - 0.5) * 0.35; bp.setXYZ(i, bp.getX(i) * sp, bp.getY(i) * sp, bp.getZ(i) * sp); }
+        bg.computeVertexNormals();
+        const bm = new T.InstancedMesh(bg, new T.MeshStandardMaterial({ color: '#4a3a2a', roughness: 1 }), spots.length), sg = new T.ConeGeometry(0.4, 1, 8).rotateZ(-Math.PI / 2),
+          sm = new T.InstancedMesh(sg, new T.MeshStandardMaterial({ color: '#c8aa88', roughness: 0.9 }), spots.length), m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), s = new T.Vector3(), v = new T.Vector3();
+        spots.forEach(([x, z], i) => { const yaw = RC.hash(x, z, 563) * 6.28, y = terrain.groundY(x, z), c = Math.cos(yaw), sn = Math.sin(yaw);
+          e.set(0, yaw, 0); q.setFromEuler(e); bm.setMatrixAt(i, m4.compose(v.set(x, y + 0.01, z), q, s.set(0.16, 0.12, 0.11)));
+          sm.setMatrixAt(i, m4.compose(v.set(x + c * 0.17, y + 0.045, z - sn * 0.17), q, s.set(0.13, 0.09, 0.09))); });
+        bm.castShadow = sm.castShadow = true; g.add(bm); g.add(sm);
+      } }
     return g;
   };
 

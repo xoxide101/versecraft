@@ -28,7 +28,7 @@
         const m = new T.Mesh(ge, new T.MeshBasicMaterial({ color, fog: false, side: T.DoubleSide })); m.renderOrder = -5; this.group.add(m);
         this.layers.push({ mesh: m, base: new T.Color(color), haze });
       };
-      ring(330, 8, 70, 2.2, 0, '#7d93b4', 0.55, H.seed, 0.92);          // far mountains
+      ring(330, 8, 70, 2.2, 0, '#7d93b4', 0.55, H.seed, 1);          // far mountains (none across the open sea: no leftover band at the horizon)
       ring(250, 4, 34, 3.4, 0, '#5f7f86', 0.45, H.seed + 1, 1);          // a nearer range
       ring(170, 3, 14, 5.5, 2.2, '#2f5a3a', 0.34, H.seed + 2, 1);       // forested hills
       ring(118, 2, 6, 8, 2.6, '#2a4d2c', 0.2, H.seed + 3, 1);           // the forest just beyond the edge
@@ -44,12 +44,12 @@
       this.layers.push({ mesh: tower, base: new T.Color(tc), haze: 0.45, mat });
       // the open sea out to the horizon, and a few low islands on it
       const sea = new T.Mesh(new T.CircleGeometry(420, 64).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: '#2f6ea8', fog: false }));
-      sea.position.set(cx, terrain.waterY - 0.08, cz); sea.renderOrder = -6; this.group.add(sea); this.layers.push({ mesh: sea, base: new T.Color('#2f6ea8'), haze: 0.4 });
+      sea.position.set(cx, terrain.waterY - 0.08, cz); sea.renderOrder = -6; this.group.add(sea); this.layers.push({ mesh: sea, base: new T.Color('#2f6ea8'), haze: 0.8 });
       for (let i = 0; i < 4; i++) {
         const a = seaMid + (i - 1.5) * 0.35 + (RC.hash(i, 1, H.seed) - 0.5) * 0.2, d = 190 + RC.hash(i, 2, H.seed) * 110, w = 14 + RC.hash(i, 3, H.seed) * 26;
         const isl = new T.Mesh(new T.SphereGeometry(w, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), new T.MeshBasicMaterial({ color: '#3f5f4a', fog: false }));
         isl.scale.set(1, 0.22 + RC.hash(i, 4, H.seed) * 0.25, 0.6); isl.position.set(cx + Math.sin(a) * d, terrain.waterY - 0.5, cz - Math.cos(a) * d); this.group.add(isl);
-        this.layers.push({ mesh: isl, base: new T.Color('#3f5f4a'), haze: 0.22 + d / 1500 });
+        this.layers.push({ mesh: isl, base: new T.Color('#3f5f4a'), haze: 0.5 + d / 1200 });
       }
     }
     // each frame: blend every layer toward the sky's horizon colour (more for further layers), dim at night

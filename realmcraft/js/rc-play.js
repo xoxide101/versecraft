@@ -124,9 +124,9 @@
         if (w === this.weather) this.weatherT = 60 + Math.random() * 60; else this.setWeather(w); this.wind.target += (Math.random() - 0.5) * 1.6; }
       // amounts: clouds come quickest, rain or snow follows them in and out (half a minute or so), and rides on slow waves and quicker bursts
       const c = (this.wxClock += dt), wv = this.weather, wave = RC.clamp(0.5 + Math.sin(c / 41) * 0.28 + Math.sin(c / 13.7 + 1.3) * 0.16 + Math.sin(c / 5.3 + 4.1) * 0.09 + Math.sin(c / 2.1) * 0.04, 0, 1);
-      this.cloud = RC.damp(this.cloud, { clear: 0, breezy: 0.12, rain: 0.5, storm: 0.72, snow: 0.42 }[wv] || 0, 0.12, dt);
-      this.precipBase = RC.damp(this.precipBase, { rain: 0.6, storm: 1 }[wv] || 0, 0.045, dt);
-      this.precip = this.precipBase * (0.3 + wave * 0.85); this.snowfall = RC.damp(this.snowfall, wv === 'snow' ? 0.4 + wave * 0.6 : 0, 0.05, dt);
+      this.cloud = RC.damp(this.cloud, { clear: 0, breezy: 0.12, rain: 0.5, storm: 0.72, snow: 0.42 }[wv] || 0, 0.035, dt);
+      this.precipBase = RC.damp(this.precipBase, { rain: 0.6, storm: 1 }[wv] || 0, 0.02, dt);
+      this.precip = this.precipBase * (0.3 + wave * 0.85); this.snowfall = RC.damp(this.snowfall, wv === 'snow' ? 0.4 + wave * 0.6 : 0, 0.025, dt);
       this.gust = 0.75 + wave * 0.5;
       if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 3.4);
       if (this.weather === 'storm' && this.precip > 0.55 && (this.flashT -= dt) <= 0) { this.flash = 0.92; this.flashT = 5.5 + Math.random() * 7.5; this.shake = 0.14; }

@@ -26,7 +26,7 @@
     land(x, z) {
       let y = 0;
       for (const s of this.shape) {
-        if (s.op === 'terrace') y += RC.smooth01((s.z - z) / s.soft) * s.rise;   // higher on the north side of the line
+        if (s.op === 'terrace') y += RC.smooth01((s.z - z) / Math.max(s.soft, s.rise * 11)) * s.rise;   // higher on the north side of the line; the climb is spread over a long gentle slope (at least ~11 cells per metre of rise)
         else if (s.op === 'slope') y += RC.smooth01((s.z0 - z) / (s.z0 - s.z1)) * s.rise;
         else if (s.op === 'roll') y += Math.max(0, Math.sin(x * s.fx) * Math.cos(z * s.fz)) * s.amp;
       }
@@ -66,8 +66,8 @@
       const ground = new THREE.Mesh(geo, this.groundMaterial(THREE));
       ground.receiveShadow = true; ground.name = 'ground'; g.add(ground);
       // water: one sheet over the sea, ripples drawn on it and drifting
-      const wtex = this.rippleTexture(THREE); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(W / 6, H / 6);
-      const water = new THREE.Mesh(new THREE.PlaneGeometry(W + 80, H + 40).rotateX(-Math.PI / 2).translate(W / 2, this.waterY, H / 2 + 20),
+      const wtex = this.rippleTexture(THREE); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set((W + 900) / 6, (H + 900) / 6);
+      const water = new THREE.Mesh(new THREE.PlaneGeometry(W + 900, H + 900).rotateX(-Math.PI / 2).translate(W / 2, this.waterY, H / 2),
         new THREE.MeshStandardMaterial({ color: '#2f7fd1', map: wtex, transparent: true, opacity: 0.86, roughness: 0.25, metalness: 0.05 }));
       water.receiveShadow = true; water.name = 'water'; g.add(water); this.waterTex = wtex;
       return g;

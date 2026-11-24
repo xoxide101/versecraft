@@ -32,6 +32,9 @@
       this.dWater = distanceField(W, H, (c, r) => cell(c, r) === '~' || cell(c, r) === '=');
       this.dLand = distanceField(W, H, (c, r) => cell(c, r) !== '~' && cell(c, r) !== '=');
       this.solid = solid;
+      // exact building outlines (walls, foundation, eaves, steps): no grass blade is planted inside or tight against them
+      this.bRects = realm.things.filter((t) => t.kind === 'building').map((t) => { const cx = t.x + t.w / 2, hw = (t.w - 0.3) / 2 + 0.4 + (t.style === 'l_wing_inn' ? 3.2 : t.style === 'apothecary_conservatory' ? 2.8 : 0); return { x0: cx - hw - (t.style === 'apothecary_conservatory' ? 0 : 0), x1: cx + hw, z0: t.z + 0.5 - 0.4, z1: t.z + t.d - 0.25 + 0.9 }; });
+      this.inBuilding = (x, z) => this.bRects.some((b) => x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1);
       // tended ground: near buildings and road junctions in the town, fading out; never everywhere (a few spots let go)
       const dBuild = distanceField(W, H, (c, r) => { for (const t of realm.things) if (t.kind === 'building' && c >= t.x - 1 && c < t.x + t.w + 1 && r >= t.z && r < t.z + t.d + 1) return true; return false; });
       const dRoad = distanceField(W, H, (c, r) => cell(c, r) === '-');
@@ -48,7 +51,7 @@
     // each cover's share at a point in the world
     masks() {
       const vn = RC.Covers.vnoise, grass = (k) => k === '.' || k === ',';   // (kept / natural: this.kept)
-      const free = (x, z) => !this.solid[Math.floor(z) * this.W + Math.floor(x)] && this.terrain.soft('-', x, z) < 0.42 + (RC.fbm(x, z, 0.9, 4, 33) - 0.5) * 0.75;   // grass creeps onto the road edges along the same ragged line
+      const free = (x, z) => !this.solid[Math.floor(z) * this.W + Math.floor(x)] && !this.inBuilding(x, z) && this.terrain.soft('-', x, z) < 0.42 + (RC.fbm(x, z, 0.9, 4, 33) - 0.5) * 0.75;   // grass creeps onto the road edges along the same ragged line
       const gaps = (x, z) => RC.smooth01((vn(x + 40, z + 40, 2.6, 11) - 0.22) / 0.25);   // bare earth here and there
       const tuft = (x, z) => 0.3 + 0.7 * RC.smooth01((vn(x + 11, z + 7, 0.5, 93) * 0.7 + vn(x, z, 0.21, 94) * 0.3 - 0.3) / 0.4);   // grass grows in clumps and tussocks, not an even fur
       return {

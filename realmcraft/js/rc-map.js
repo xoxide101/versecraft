@@ -4,7 +4,7 @@
   const RC = window.RC;
   const ROOF = { crimson: '#b4232a', cobalt: '#2649b5', terracotta: '#c0562a', emerald: '#1f8a4c' };
   // what blocks walking (cells and circles), and what can be used with Space
-  const SOLID = { fountain: 1.6, well: 0.7, statue: 0.6, anvil: 0.5, telescope: 0.4, bell: 0.6, crates: 0.7, dock_cargo: 0.8, campfire: 0.5, station: 0.8, tablet: 0.5, noticeboard: 0.5, sign: 0.3, lamp: 0.2, chest: 0.45, bookshelf: 0.5 };
+  const SOLID = { fountain: 1.95, well: 0.7, statue: 0.6, anvil: 0.5, telescope: 0.4, bell: 0.6, crates: 0.7, dock_cargo: 0.8, campfire: 0.5, station: 0.8, tablet: 0.5, noticeboard: 1.3, sign: 0.5, lamp: 0.2, chest: 0.45, bookshelf: 0.5 };
   const USE = { sign: 'Read', noticeboard: 'Read', tablet: 'Read', statue: 'Look', fountain: 'Look', well: 'Look', crates: 'Search', dock_cargo: 'Search', anvil: 'Look', telescope: 'Look through', bell: 'Ring', campfire: 'Warm up', bookshelf: 'Read', shrub: 'Search', chest: 'Open', forage: 'Gather', station: 'Use' };
 
   RC.MapCraft = {
@@ -32,7 +32,7 @@
         glow: new THREE.MeshStandardMaterial({ color: '#ffd27a', emissive: '#ffb347', emissiveIntensity: 0.4 }), glass: new THREE.MeshStandardMaterial({ color: '#1e2328', emissive: '#ffcf7a', emissiveIntensity: 0.05, roughness: 0.9 }),
         pane: new THREE.MeshStandardMaterial({ color: '#b8ccd6', transparent: true, opacity: 0.16, roughness: 0.04, metalness: 0.1, envMapIntensity: 1.8, depthWrite: false }) };
       const curtainMats = ['#e8dcc0', '#b8483a', '#5a6a8a', '#d8c890', '#7a8a5a', '#f0ece4'].map((c) => M(c, { emissive: c, emissiveIntensity: 0, roughness: 0.95, side: THREE.DoubleSide }));
-      const chimneys = [], eaves = [], aged = [], afterPlace = [];
+      const chimneys = [], eaves = [], aged = [], afterPlace = []; RC.Aging.shared = shared;
       shared.night = shared.night || { value: 0 };
       tickers.push((t, s) => { mats.glow.emissiveIntensity = 0.35 + s.night * 2.2; mats.glass.emissiveIntensity = 0.05 + s.night * 1.1; for (const c of curtainMats) c.emissiveIntensity = s.night * 0.28; });
       const add = (obj, x, z, rot) => { obj.position.set(x, Y(x, z), z); if (rot) obj.rotation.y = rot; obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); g.add(obj); return obj; };
@@ -72,9 +72,9 @@
       const ROOFTINT = { crimson: '#ffffff', terracotta: '#f0b090', cobalt: '#9fb4e6', emerald: '#9fd4b0' };
 
       const STYLE = {
-        one_story_cottage: { wall: 'timber', h: 2.4, roof: 1.6 }, two_story_timber: { wall: 'timber', h: 3.8, roof: 1.8 }, smithery_foundry: { wall: 'darkstone', h: 2.8, roof: 1.4, bigChimney: true },
-        observatory_parlor: { wall: 'plaster', h: 2.8, roof: 1.5, tower: true }, grand_guildhall: { wall: 'stone', h: 4.0, roof: 1.9, columns: true }, l_wing_inn: { wall: 'timber', h: 3.4, roof: 1.7, wing: true },
-        apothecary_conservatory: { wall: 'plaster', h: 2.6, roof: 1.5, glasshouse: true }, longhouse_tavern: { wall: 'timber', h: 2.3, roof: 2.2, barrels: true },
+        one_story_cottage: { wall: 'timber', h: 2.9, roof: 1.7 }, two_story_timber: { wall: 'timber', h: 3.8, roof: 1.8 }, smithery_foundry: { wall: 'darkstone', h: 3.2, roof: 1.5, bigChimney: true },
+        observatory_parlor: { wall: 'plaster', h: 3.2, roof: 1.6, tower: true }, grand_guildhall: { wall: 'stone', h: 4.0, roof: 1.9, columns: true }, l_wing_inn: { wall: 'timber', h: 3.4, roof: 1.7, wing: true },
+        apothecary_conservatory: { wall: 'plaster', h: 3.1, roof: 1.6, glasshouse: true }, longhouse_tavern: { wall: 'timber', h: 2.9, roof: 2.3, barrels: true },
       };
       const roof = (w, d, h, mat, wallMat, tex, tint) => {   // w along the ridge, d across, h tall
         const o = new THREE.Group(), half = d / 2, ov = 0.35, run = half + ov, Ls = Math.hypot(run, h * (run / half)), ang = Math.atan2(h, half), L = w + 0.5;
@@ -115,6 +115,7 @@
         aged.push([RC.age(THREE, wallM, { kind: upperKind === 'brick' || upperKind === 'stone' || upperKind === 'darkstone' ? 1 : 0, top: st.h, seed: seedB * 10, brick: WT.brick }), 0.3]);
         const ridgeTint = { crimson: '#8a3a2a', terracotta: '#b0603a', cobalt: '#3a4a6a', emerald: '#3a5a46' }[b.roof] || '#6a4a3a';
         const rf = roof(W + 0.2, D + 0.2, st.roof, roofM, wallM, rt, ridgeTint); rf.position.y = st.h; grp.add(rf); fadeMats.push(...rf.userData.mats);
+        for (const m of rf.userData.mats) aged.push([RC.age(THREE, m, { kind: 3, top: st.h + st.roof, seed: seedB * 5 }), st.h]);   // moss and lichen on the tiles, more toward the eaves
         const stoneM = (w2, h2) => { const lt = WT.stone; return M('#ffffff', { map: rep(lt.map, w2 / lt.m, h2 / lt.m), normalMap: rep(lt.normalMap, w2 / lt.m, h2 / lt.m), roughness: 0.92 }); };
         if (lowerKind) { const lt = WT[lowerKind], lm = M('#ffffff', { map: rep(lt.map, W / lt.m, lowH / lt.m), normalMap: rep(lt.normalMap, W / lt.m, lowH / lt.m), roughness: 0.92 }); grp.add(box(W + 0.06, lowH, D + 0.06, lm, 0, 0, 0)); fadeMats.push(lm); aged.push([RC.age(THREE, lm, { kind: 1, top: st.h, seed: seedB * 10 + 3 }), 0.3]); }   // a stone or brick ground floor
         if (upperKind === 'plaster') { const qm = stoneM(0.4, st.h); for (const [qx, qz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) for (let y = lowerKind ? lowH : 0, k = 0; y < st.h - 0.2; y += 0.42, k++) grp.add(box(k % 2 ? 0.34 : 0.48, 0.38, k % 2 ? 0.48 : 0.34, qm, qx * (W / 2 - 0.1), y, qz * (D / 2 - 0.1))); }   // corner stones on the stucco
@@ -133,19 +134,40 @@
         if (b.chimney) { const cw = st.bigChimney ? 1 : 0.6, chH = st.roof + 1.2, cm = stoneM(cw, chH); aged.push([RC.age(THREE, cm, { kind: 1, top: st.h + chH, seed: seedB * 7 }), st.h + 0.2]); chimneys.push({ lx: W * 0.28, ly: st.h + chH + 0.35, lz: -D * 0.15, big: !!st.bigChimney, seed: seedB }); grp.add(box(cw, chH, cw, cm, W * 0.28, st.h, -D * 0.15)); grp.add(box(cw + 0.16, 0.12, cw + 0.16, cm, W * 0.28, st.h + chH, -D * 0.15)); grp.add(cyl(0.1, 0.12, 0.28, M('#9a5a3a'), 8, W * 0.28, st.h + chH + 0.12, -D * 0.15)); if (st.bigChimney) grp.add(box(0.6, 0.15, 0.6, mats.glow, W * 0.28, st.h + st.roof + 1.2, -D * 0.15)); }
         // front: door and windows (glowing at night)
         const front = D / 2 + 0.01, dx = b.door ? b.door.x - cx : 0;
-        const holes = [[dx - 0.7, -0.2, dx + 0.7, 2.1]], stoneWall = upperKind !== 'timber' || lowerKind, surround = stoneWall ? stoneM(0.3, 2) : frameM;
-        for (let k = 0; k < 5; k++) grp.add(box(0.19, 1.75 - rB() * 0.015, 0.05, doorM, dx - 0.4 + k * 0.2, 0.005, front + 0.035));   // boards, a hair apart
-        grp.add(box(1.0, 1.75, 0.02, mats.glass, dx, 0, front + 0.012));   // (dark behind the gaps)
-        grp.add(box(1.36, 0.2, 0.2, surround, dx, 1.75, front + 0.02)); grp.add(box(0.16, 1.78, 0.18, surround, dx - 0.6, 0, front + 0.02)); grp.add(box(0.16, 1.78, 0.18, surround, dx + 0.6, 0, front + 0.02));
-        { const s1 = new THREE.Mesh(RC.roughBox(THREE, 1.5, 0.2, 0.55, 0.04, rB), GRANM); s1.position.set(dx, -0.02, front + 0.3); grp.add(s1); const s2 = new THREE.Mesh(RC.roughBox(THREE, 1.8, 0.24, 0.6, 0.05, rB), GRANM); s2.position.set(dx + (rB() - 0.5) * 0.1, -0.24, front + 0.72); grp.add(s2); }   // worn stone steps
-        const hood = rB() < 0.55;
-        if (hood) {   // a small pent roof over the door on two carved brackets
-          const hm = roofM.clone(); if (hm.map) { hm.map = roofM.map.clone(); hm.map.needsUpdate = true; hm.map.repeat.set(1.8 / rt.m, 0.8 / rt.m); } if (hm.normalMap) { hm.normalMap = roofM.normalMap.clone(); hm.normalMap.needsUpdate = true; hm.normalMap.repeat.set(1.8 / rt.m, 0.8 / rt.m); }
-          const hr = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.06, 0.85), hm); hr.rotation.x = 0.45; hr.position.set(dx, 2.22, front + 0.38); hr.castShadow = true; grp.add(hr); fadeMats.push(hm);
-          for (const sx of [-0.7, 0.7]) { const kn = new THREE.Shape(); kn.moveTo(0, 0); kn.lineTo(0.55, 0); kn.quadraticCurveTo(0.12, -0.1, 0, -0.5); kn.lineTo(0, 0); const kg = new THREE.ExtrudeGeometry(kn, { depth: 0.07, bevelEnabled: false }); kg.rotateY(-Math.PI / 2); const k2 = new THREE.Mesh(kg, beamM); k2.position.set(dx + sx + 0.035, 2.05, front); grp.add(k2); }
+        const DH = 2.02, holes = [[dx - 0.85, -0.2, dx + 0.85, DH + 0.4]], stoneWall = upperKind !== 'timber' || lowerKind, REV = 0.24;   // (REV: how far the frame stands out: the door sits back in it)
+        for (let k = 0; k < 5; k++) grp.add(box(0.188, DH - 0.01 - rB() * 0.02, 0.05, doorM, dx - 0.4 + k * 0.2, 0.01, front + 0.03));   // boards, a hair apart
+        grp.add(box(1.0, DH, 0.02, mats.glass, dx, 0, front + 0.012));   // (dark behind the gaps)
+        for (const [w2, y2] of [[0.9, 0.18], [0.9, DH * 0.5], [0.9, DH - 0.3]]) grp.add(box(w2, 0.1, 0.035, doorM, dx, y2, front + 0.07));   // ledges across the back of the boards (seen at the front: the old way)
+        if (stoneWall) {   // jambs of dressed stone blocks, long and short in turn, and a lintel with a keystone
+          for (const s of [-1, 1]) for (let y = 0, k = 0; y < DH - 0.05; k++) { const bh = Math.min(0.32 + rB() * 0.1, DH - y), bw = k % 2 ? 0.24 : 0.36, jb = new THREE.Mesh(RC.roughBox(THREE, bw, bh - 0.015, REV + 0.06, 0.025, rB), GRANM); jb.position.set(dx + s * (0.5 + bw / 2), y + bh / 2, front + REV / 2 - 0.02); grp.add(jb); y += bh; }
+          const ln = new THREE.Mesh(RC.roughBox(THREE, 1.75, 0.32, REV + 0.08, 0.03, rB), GRANM); ln.position.set(dx, DH + 0.16, front + REV / 2 - 0.01); grp.add(ln);
+          const ks = new THREE.Mesh(RC.roughBox(THREE, 0.24, 0.38, REV + 0.12, 0.02, rB), GRANM); ks.position.set(dx, DH + 0.18, front + REV / 2); grp.add(ks);
+        } else {   // heavy oak posts and a lintel beam, pegged
+          for (const s of [-1, 1]) grp.add(box(0.18, DH, REV, beamM, dx + s * 0.59, 0, front + REV / 2 - 0.02));
+          grp.add(box(1.6, 0.24, REV + 0.04, beamM, dx, DH, front + REV / 2 - 0.02));
+          for (const s of [-1, 1]) { const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.02, 8).rotateX(Math.PI / 2), mats.darkWood); peg.position.set(dx + s * 0.59, DH + 0.12, front + REV + 0.02); grp.add(peg); }
         }
-        for (const sy of [0.35, 1.35]) grp.add(box(0.85, 0.06, 0.03, mats.iron, dx + 0.02, sy, front + 0.075));
-        { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 6, 14), mats.iron); ring.position.set(dx + 0.32, 0.95, front + 0.09); grp.add(ring); }
+        { const th = new THREE.Mesh(RC.roughBox(THREE, 1.04, 0.07, REV + 0.04, 0.015, rB), GRANM); th.position.set(dx, 0.0, front + REV / 2); grp.add(th); }   // the threshold, worn
+        // worn stone steps: three half-round treads fanning out from the door, edges rounded like river stone, each dished where feet land
+        for (const [rad, top, depth] of [[1.0, 0.04, 0.55], [1.45, -0.1, 0.45], [1.95, -0.22, 0.4]]) {
+          const prof = [[0, top], [rad - 0.12, top], [rad - 0.05, top - 0.025], [rad, top - 0.09], [rad, -0.7]].map(([x, y]) => new THREE.Vector2(x, y));
+          const sg = new THREE.LatheGeometry(prof, 40, -Math.PI / 2, Math.PI), sp = sg.attributes.position, sd = rB() * 6;
+          for (let i = 0; i < sp.count; i++) { const x = sp.getX(i), y = sp.getY(i), z = sp.getZ(i), a = Math.atan2(x, z), k = 1 + 0.035 * Math.sin(a * 5 + sd);
+            const dish = y > top - 0.04 ? 0.03 * Math.exp(-(x * x) / 0.35) * Math.exp(-(z * z) / (rad * rad * 0.5)) : 0;
+            sp.setXYZ(i, x * k, y - dish, z * k * depth / 0.5 * 0.5); }
+          sg.computeVertexNormals(); const st2 = new THREE.Mesh(sg, GRANM); st2.position.set(dx, 0, front); st2.castShadow = st2.receiveShadow = true; grp.add(st2);
+        }
+        const hood = rB() < 0.55;
+        if (hood) {   // a small pent hood over the door: boards sloping away from the wall, an edge board, and two straight struts back to the wall
+          const hm = roofM.clone(); if (hm.map) { hm.map = roofM.map.clone(); hm.map.needsUpdate = true; hm.map.repeat.set(1.9 / rt.m, 0.9 / rt.m); } if (hm.normalMap) { hm.normalMap = roofM.normalMap.clone(); hm.normalMap.needsUpdate = true; hm.normalMap.repeat.set(1.9 / rt.m, 0.9 / rt.m); }
+          const hw = 1.9, hd = 0.95, hy = 2.5, hr = new THREE.Mesh(new THREE.BoxGeometry(hw, 0.07, hd), hm), tilt = 0.32;
+          hr.rotation.x = tilt; hr.position.set(dx, hy - Math.sin(tilt) * hd / 2, front + Math.cos(tilt) * hd / 2 + 0.03); hr.castShadow = true; grp.add(hr); fadeMats.push(hm);
+          const edge = box(hw + 0.06, 0.1, 0.05, beamM, dx, hy - Math.sin(tilt) * hd - 0.1, front + Math.cos(tilt) * hd + 0.03); grp.add(edge);   // the edge board
+          const back = box(hw + 0.06, 0.14, 0.06, beamM, dx, hy - 0.04, front + 0.04); grp.add(back);   // a rail where it meets the wall
+          for (const sx of [-0.8, 0.8]) { const len = Math.hypot(0.8, 0.55), st3 = box(0.07, len, 0.07, beamM), ang2 = Math.atan2(0.8, 0.55); st3.rotation.x = ang2; st3.position.set(dx + sx, hy - 0.55 - 0.04, front + 0.5); st3.position.y = hy - 0.5 - len / 2 + 0.3; grp.add(st3); }
+        }
+        for (const sy of [0.42, DH - 0.42]) { grp.add(box(0.78, 0.055, 0.02, mats.iron, dx - 0.08, sy, front + 0.09)); const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), mats.iron); knob.position.set(dx - 0.47, sy + 0.027, front + 0.1); grp.add(knob); }   // strap hinges
+        { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.065, 0.012, 6, 14), mats.iron); ring.position.set(dx + 0.3, 1.0, front + 0.11); grp.add(ring); const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.012, 10).rotateX(Math.PI / 2), mats.iron); plate.position.set(dx + 0.3, 1.07, front + 0.1); grp.add(plate); }
         const shutters = st.wall === 'timber' || st.wall === 'plaster', shutM = RC.age(THREE, woodM(['#6a8aa8', '#7a9a6a', '#a85a44', '#7a7a8a', '#5a7a6a'][Math.floor(RC.hash(b.x, b.z, 29) * 5)], 0.3, 0.6), { kind: 2, seed: seedB * 3 }); aged.push([shutM, 0]);
         const curt = rB() < 0.75 ? [curtainMats[Math.floor(rB() * curtainMats.length)]] : null;
         const sill = stoneM(1.1, 0.12), flowersM = [M('#d94a6a'), M('#f2c94c'), M('#ffffff'), M('#9b59d0')];
@@ -167,9 +189,26 @@
           for (let i = 0; i < 4; i++) { const px = -W / 2 + 1 + i * ((W - 2) / 3); grp.add(box(0.62, 0.22, 0.62, sm, px, 0, front + 0.55)); grp.add(cyl(0.22, 0.26, st.h - 0.5, sm, 14, px, 0.22, front + 0.55)); grp.add(box(0.6, 0.28, 0.6, sm, px, st.h - 0.28, front + 0.55)); } }
         if (st.wing) { const wg = box(3.2, st.h - 0.8, D * 0.6, wallM, W / 2 + 1.4, 0, -D * 0.15); grp.add(wg); const wr = roof(D * 0.6, 3.2, 1.3, roofM, wallM, rt, ridgeTint); wr.rotation.y = Math.PI / 2; wr.position.set(W / 2 + 1.4, st.h - 0.8, -D * 0.15); grp.add(wr); fadeMats.push(...wr.userData.mats); }
         if (st.glasshouse) { const gm = new THREE.MeshStandardMaterial({ color: '#bfe8d0', transparent: true, opacity: 0.45, roughness: 0.1 }); grp.add(box(2.6, 2.0, D * 0.7, gm, -W / 2 - 1.3, 0, 0)); }
-        if (st.barrels) for (let i = 0; i < 3; i++) grp.add(cyl(0.3, 0.3, 0.7, M('#7a4a22'), 10, dx + 1.4 + i * 0.65, 0, front + 0.5));
-        // hanging sign over the door
-        { const sx = dx + (hood ? 1.25 : 0.95); grp.add(box(0.08, 0.08, 0.7, mats.iron, sx, 2.1, front + 0.35)); grp.add(box(0.7, 0.45, 0.06, M('#e9d8a6'), sx, 1.6, front + 0.7)); }
+        if (st.barrels) {   // real barrels: bulging oak staves, iron hoops, a lid; different sizes, one tipped on its side, set against the wall
+          const sd = RC.rng(seedB * 13 + 7), prof = (h2, r0, r1) => { const pts = []; for (let i = 0; i <= 10; i++) { const t = i / 10, bulge = Math.sin(t * Math.PI); pts.push(new THREE.Vector2(r0 + (r1 - r0) * bulge * 1.0 + 0.0, t * h2)); } return pts; };
+          [[0, 0.62, 0.27, 0.34, false], [0.72, 0.5, 0.25, 0.31, false], [1.38, 0.32, 0.23, 0.29, true]].forEach(([ox, h2, r0, r1, side], bi) => {
+            const bg = new THREE.Group(), staves = new THREE.Mesh(new THREE.LatheGeometry(prof(h2, r0, r1 - 0.01), 16), M('#7a4a22', { map: OAK && OAK.map, roughness: 0.85, side: THREE.DoubleSide })); staves.castShadow = true; bg.add(staves);
+            bg.add(cyl(r0 - 0.01, r0 - 0.01, 0.03, M('#6a4020'), 16, 0, h2 - 0.02)); bg.add(cyl(r0 - 0.01, r0 - 0.01, 0.03, M('#6a4020'), 16, 0, 0.0));
+            for (const t of [0.12, 0.3, 0.7, 0.88]) { const rr = r0 + (r1 - r0) * Math.sin(t * Math.PI) + 0.004, hp = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.014, 6, 18), mats.iron); hp.rotation.x = Math.PI / 2; hp.position.y = t * h2; bg.add(hp); }   // iron hoops
+            if (side) { bg.rotation.order = 'YXZ'; bg.rotation.z = Math.PI / 2; bg.rotation.y = 0.4 + sd() * 0.4; bg.position.set(dx + 1.4 + ox * 0.9, r1, front + 0.55 + sd() * 0.15); }
+            else bg.position.set(dx + 1.35 + ox * 0.95 + (sd() - 0.5) * 0.1, 0, front + 0.5 + (bi === 1 ? 0.2 : 0) + sd() * 0.1);
+            grp.add(bg);
+          });
+        }
+        // hanging sign: an iron arm out from the front wall towards the street, a diagonal brace under it, the board on two chains and turned to face along the path so it reads from either side
+        { const sd2 = dx > 0 ? -1 : 1, lim = W / 2 - 0.5, sx = Math.max(-lim, Math.min(lim, dx + sd2 * 2.3)), ay = st.h - 0.7, ln = 1.2, az0 = front + 0.04;
+          grp.add(box(0.06, 0.06, ln, mats.iron, sx, ay, az0));   // arm, out from the wall
+          const br = box(0.04, 0.04, 0.98, mats.iron); br.rotation.x = Math.atan2(0.65, ln * 0.55) ; br.position.set(sx, ay - 0.3, az0 + ln * 0.28); grp.add(br);   // brace
+          grp.add(box(0.07, 0.34, 0.07, mats.iron, sx, ay - 0.28, az0));   // plate on the wall
+          grp.add(box(0.05, 0.05, 0.04, mats.iron, sx, ay + 0.03, az0 + ln));   // end finial
+          const bz = az0 + ln - 0.28;
+          for (const o of [-0.22, 0.22]) grp.add(box(0.015, 0.18, 0.015, mats.iron, sx, ay - 0.17, bz + o));   // chains
+          const sb = RC.Signs.board(THREE, RC.Signs.shopTexture(THREE, b.name, b.style, seedB), 0.78, 0.52, 0.05, frameM); sb.position.set(sx, ay - 0.52, bz); grp.add(sb); }   // (the shop's name and picture, painted on both faces)
         // climbers: ivy over a side or the back (sometimes the front, round the windows); or roses up a trellis by the door
         const climb = rB();
         if (climb < 0.45) { const face = Math.floor(rB() * 4), span = face < 2 ? W : D, iv = RC.Aging.ivy(THREE, span, st.h * (0.5 + rB() * 0.4), face === 0 ? holes.map(([a, b2, c, d]) => [a, b2, c, d]) : [], seedB * 31 + face, null);
@@ -177,7 +216,7 @@
         else if (climb < 0.75) { let tx = dx + (rB() < 0.5 ? -1.25 : 1.25); const free = (x) => !holes.slice(1).some(([a, , c]) => x + 0.5 > a && x - 0.5 < c) && Math.abs(x) < W / 2 - 0.5;
           if (!free(tx)) tx = dx - (tx - dx); if (free(tx)) { const tr = RC.Aging.trellis(THREE, 0.9, 1.9, woodM('#d8d0c0', 0.2, 0.5)); tr.position.set(tx, 0.25, front + 0.04); grp.add(tr); const ro = RC.Aging.ivy(THREE, 0.9, 1.95, [], seedB * 41, [['#c8203a'], ['#f0b8c8'], ['#fff4e8'], ['#e8a040']][Math.floor(rB() * 4)]); ro.position.set(tx, 0.25, front + 0.08); grp.add(ro); } }
         add(grp, cx, cz); grp.position.y = Y(cx, z1 + 0.3);
-        { const gy = grp.position.y;
+        { const gy = grp.position.y; grp.updateMatrixWorld(true);   // (placed first: the weeds below read the ground where they really stand)
           for (const [m, off] of aged) { m.userData.age.uAgBase.value = gy + off; m.userData.age.uAgTop.value += gy; }
           aged.length = 0;
           for (const c of chimneys) if (c.lx != null) { c.x = cx + c.lx; c.y = gy + c.ly; c.z = cz + c.lz; delete c.lx; }
@@ -185,7 +224,7 @@
           for (const s of [-1, 1]) eaves.push({ x0: cx - L2, x1: cx + L2, c: cz + s * run, y: ey, ground: (x, z) => Y(x, z) });
           // weeds and grass along the foot of every wall, standing on the real ground
           for (const [fx, fz, span, rot] of [[0, D / 2 + 0.2, W + 0.3, 0], [0, -D / 2 - 0.2, W + 0.3, Math.PI], [W / 2 + 0.2, 0, D + 0.3, Math.PI / 2], [-W / 2 - 0.2, 0, D + 0.3, -Math.PI / 2]]) {
-            const wd = RC.Aging.weeds(THREE, span, seedB * 9 + fx + fz); wd.position.set(fx, 0, fz); wd.rotation.y = rot; grp.add(wd); wd.updateMatrixWorld(true);
+            const wd = RC.Aging.weeds(THREE, span, seedB * 9 + fx + fz, rot === 0 ? [dx - 1.6, dx + 1.6] : null); wd.position.set(fx, 0, fz); wd.rotation.y = rot; grp.add(wd); wd.updateMatrixWorld(true);
             const pp = wd.geometry.attributes.position, v = new THREE.Vector3();
             for (let i = 0; i < pp.count; i += 3) { v.set(pp.getX(i), 0, pp.getZ(i)).applyMatrix4(wd.matrixWorld); const dy = Y(v.x, v.z) - gy - 0.02; for (let k = 0; k < 3; k++) pp.setY(i + k, pp.getY(i + k) + dy); }
             pp.needsUpdate = true; wd.geometry.computeBoundingSphere();
@@ -246,11 +285,58 @@
           });
           return o;
         },
-        fountain: () => { const o = new THREE.Group(); o.add(cyl(1.6, 1.7, 0.45, mats.white, 24)); o.add(cyl(1.35, 1.35, 0.06, new THREE.MeshStandardMaterial({ color: '#4aa3e8', roughness: 0.15 }), 24, 0, 0.36)); o.add(cyl(0.25, 0.3, 1.1, mats.white, 12)); o.add(cyl(0.75, 0.55, 0.22, mats.white, 16, 0, 1.0)); o.add(cyl(0.12, 0.15, 0.6, mats.white, 8, 0, 1.2)); return o; },
+        fountain: () => {   // a three-tier stone fountain: carved basin, fluted column, bowls, and water that jets, spills and ripples
+          const o = new THREE.Group(), lt = WT.stone, rp = (tx, x, y) => { if (!tx) return tx; const c = tx.clone(); c.needsUpdate = true; c.wrapS = c.wrapT = THREE.RepeatWrapping; c.repeat.set(x, y); return c; };
+          const sm = (rx, ry) => M('#e4ddd0', { map: rp(lt.map, rx, ry), normalMap: rp(lt.normalMap, rx, ry), roughness: 0.78 }), stone = sm(3, 1), dark = M('#8d887e', { roughness: 0.9 }), moss = M('#59703a', { roughness: 1 });
+          const lathe = (pts, seg, mat, y = 0) => { const m = new THREE.Mesh(new THREE.LatheGeometry(pts.map(([r, h]) => new THREE.Vector2(r, h)), seg), mat); m.position.y = y; m.castShadow = m.receiveShadow = true; mat.side = THREE.DoubleSide; return m; };
+          o.add(lathe([[0, 0], [1.9, 0], [1.9, 0.06], [1.78, 0.1], [1.8, 0.5], [1.86, 0.56], [1.86, 0.62], [1.62, 0.62], [1.6, 0.52], [1.56, 0.16], [0, 0.16]], 40, stone));   // outer basin with a stepped plinth and flat coping
+          for (let i = 0; i < 20; i++) { const a = (i / 20) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);   // carved panels round the basin, with a dark inset
+            const p = box(0.5, 0.3, 0.06, dark, c * 1.795, 0.2, s * 1.795); p.rotation.y = -a + Math.PI / 2; o.add(p);
+            const pil = cyl(0.045, 0.05, 0.42, stone, 8, Math.cos(a + 0.157) * 1.8, 0.12, Math.sin(a + 0.157) * 1.8); o.add(pil); }
+          for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + 0.2; o.add(cyl(0.1, 0.12, 0.1, stone, 10, Math.cos(a) * 1.74, 0.62, Math.sin(a) * 1.74)); const b = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), stone); b.position.set(Math.cos(a) * 1.74, 0.82, Math.sin(a) * 1.74); b.castShadow = true; o.add(b); }
+          for (let i = 0; i < 14; i++) { const a = RC.hash(i, 3, 61) * 6.28, m2 = new THREE.Mesh(new THREE.SphereGeometry(0.1 + RC.hash(i, 4, 61) * 0.08, 8, 5, 0, 6.3, 0, 1.6), moss); m2.scale.y = 0.45; m2.position.set(Math.cos(a) * 1.86, 0.1 + RC.hash(i, 5, 61) * 0.45, Math.sin(a) * 1.86); o.add(m2); }   // moss where the water runs down the stone
+          const water = new THREE.MeshStandardMaterial({ color: '#4fa9de', roughness: 0.04, metalness: 0.15, transparent: true, opacity: 0.82, envMapIntensity: 1.6 });
+          const w1 = cyl(1.58, 1.58, 0.02, water, 40, 0, 0.46), w2 = cyl(0.84, 0.84, 0.02, water, 32, 0, 1.42); o.add(w1, w2);
+          for (const [r, h] of [[0.34, 0.16], [0.3, 0.6], [0.26, 1.0]]) o.add(cyl(r, r - 0.03, h, stone, 14, 0, r === 0.34 ? 0.16 : r === 0.3 ? 0.32 : 0.92));
+          for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; o.add(cyl(0.028, 0.028, 0.95, stone, 6, Math.cos(a) * 0.255, 0.4, Math.sin(a) * 0.255)); }   // the fluted column
+          for (const y of [0.34, 0.9]) { const tr = new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.045, 8, 20), stone); tr.rotation.x = Math.PI / 2; tr.position.y = y; o.add(tr); }
+          o.add(lathe([[0, 0], [0.6, 0], [0.62, 0.12], [0.98, 0.36], [1.0, 0.44], [0.92, 0.44], [0.9, 0.38], [0.56, 0.18], [0, 0.18]], 36, stone, 1.2 - 0.0));   // the second, wider bowl on a scalloped lip
+          o.add(cyl(0.2, 0.26, 0.5, stone, 12, 0, 1.38)); o.add(lathe([[0, 0], [0.3, 0], [0.5, 0.2], [0.46, 0.22], [0.28, 0.08], [0, 0.08]], 24, stone, 1.9));
+          const urn = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 10), stone); urn.position.y = 2.18; urn.scale.y = 1.25; urn.castShadow = true; o.add(urn); o.add(cyl(0.03, 0.05, 0.22, stone, 8, 0, 2.3));
+          const N = 90, dm = new THREE.InstancedMesh(new THREE.SphereGeometry(0.028, 6, 5), water, N), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(1, 1, 1);
+          tickers.push((tm) => { for (let i = 0; i < N; i++) { const grp = i % 3, ph = (tm * (0.55 + grp * 0.08) + i * 0.137) % 1, a = i * 2.399;
+              let r, y;   // 0: jets arching from the top into the upper bowl; 1: spill off the bowl's lip into the basin; 2: a thin veil off the lowest bowl
+              if (grp === 0) { r = ph * 0.62; y = 2.5 + 0.9 * ph - 3.4 * ph * ph + 0.0; y = Math.max(y, 1.44); } else if (grp === 1) { r = 0.95 + ph * 0.3; y = 1.6 - ph * ph * 1.15; } else { r = 0.45 + ph * 0.22; y = 1.95 - ph * ph * 0.9; y = Math.max(y, 1.44); }
+              if (y < 0.47 && grp === 1) y = 0.47;
+              m4.compose(v.set(Math.cos(a) * r, y, Math.sin(a) * r), q, sc); dm.setMatrixAt(i, m4); }
+            dm.instanceMatrix.needsUpdate = true; w1.scale.setScalar(1 + Math.sin(tm * 2.3) * 0.004); w1.position.y = 0.46 + Math.sin(tm * 1.7) * 0.004; });
+          o.add(dm); return o; },
         well: () => { const o = new THREE.Group(); o.add(cyl(0.6, 0.65, 0.7, mats.stone, 14)); o.add(box(0.08, 1.4, 0.08, mats.wood, -0.55, 0.5, 0)); o.add(box(0.08, 1.4, 0.08, mats.wood, 0.55, 0.5, 0)); const r = gable(1.4, 1.1, 0.5, M('#8b4a2b')); r.position.y = 1.9; o.add(r); return o; },
-        statue: () => { const o = new THREE.Group(); o.add(box(1, 0.6, 1, mats.stone)); o.add(cyl(0.22, 0.28, 1.1, M('#d9d6cf'), 8, 0, 0.6)); const h = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), M('#d9d6cf')); h.position.y = 1.95; o.add(h); return o; },
-        sign: () => { const o = new THREE.Group(); o.add(box(0.08, 1.1, 0.08, mats.wood)); o.add(box(0.8, 0.45, 0.07, M('#c9a46a'), 0, 0.8, 0)); return o; },
-        noticeboard: () => { const o = new THREE.Group(); o.add(box(0.08, 1.6, 0.08, mats.wood, -0.6)); o.add(box(0.08, 1.6, 0.08, mats.wood, 0.6)); o.add(box(1.3, 0.85, 0.06, M('#a0703f'), 0, 0.7, 0)); for (let i = 0; i < 4; i++) o.add(box(0.25, 0.3, 0.02, M('#f5ecd5'), -0.4 + i * 0.27, 0.95 + (i % 2) * 0.1, 0.04)); return o; },
+        statue: () => {   // a grand monument: tiered marble plinth with gold inlay, a robed crowned figure with outspread gilded wings, a halo, and gems that glow softly
+          const o = new THREE.Group(), marble = M('#ece8df', { roughness: 0.35, metalness: 0.02 }), dkm = M('#6b6a72', { roughness: 0.5, metalness: 0.2 }), gold = M('#d9a93a', { metalness: 0.95, roughness: 0.22 }), bronze = M('#8a5a2e', { metalness: 0.85, roughness: 0.38 });
+          const gem = (c) => M(c, { roughness: 0.05, metalness: 0.1, emissive: c, emissiveIntensity: 0.55 }), ruby = gem('#d41f3a'), sapph = gem('#2a56e0'), emer = gem('#1fb36a'), amethyst = gem('#8a3fd4');
+          const sh = (g2, m, x, y, z) => { const e = new THREE.Mesh(g2, m); e.position.set(x, y, z); e.castShadow = e.receiveShadow = true; o.add(e); return e; };
+          sh(new THREE.CylinderGeometry(1.5, 1.6, 0.18, 8), dkm, 0, 0.09, 0); sh(new THREE.CylinderGeometry(1.25, 1.35, 0.22, 8), marble, 0, 0.29, 0); sh(new THREE.CylinderGeometry(1.0, 1.1, 0.3, 8), marble, 0, 0.55, 0);   // stepped octagonal base
+          for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + Math.PI / 8; sh(new THREE.CylinderGeometry(0.035, 0.035, 0.05, 8).rotateX(Math.PI / 2), i % 2 ? gold : bronze, Math.cos(a) * 1.3, 0.3, Math.sin(a) * 1.3).rotation.y = -a; sh(new THREE.OctahedronGeometry(0.07), [ruby, sapph, emer, amethyst][i % 4], Math.cos(a) * 1.36, 0.32, Math.sin(a) * 1.36); }   // gems set round the second step
+          const ring = sh(new THREE.TorusGeometry(1.03, 0.025, 6, 40), gold, 0, 0.71, 0); ring.rotation.x = Math.PI / 2;   // gold band
+          sh(new THREE.CylinderGeometry(0.62, 0.8, 0.8, 8), marble, 0, 1.1, 0); sh(new THREE.BoxGeometry(0.9, 0.3, 0.06), gold, 0, 1.12, 0.64);   // pedestal with a gilded plaque
+          for (const [x, c] of [[-0.3, ruby], [0, sapph], [0.3, emer]]) sh(new THREE.OctahedronGeometry(0.05), c, x, 1.12, 0.69);
+          sh(new THREE.CylinderGeometry(0.2, 0.46, 1.15, 14), marble, 0, 2.1, 0);   // the robed figure
+          const sk = sh(new THREE.ConeGeometry(0.5, 0.4, 14, 1, true), marble, 0, 1.62, 0); sk.material = marble.clone(); sk.material.side = THREE.DoubleSide;
+          sh(new THREE.CylinderGeometry(0.205, 0.205, 0.05, 14), gold, 0, 1.78, 0);   // gold sash
+          sh(new THREE.SphereGeometry(0.15, 16, 12), marble, 0, 2.86, 0); sh(new THREE.CylinderGeometry(0.11, 0.17, 0.2, 10), marble, 0, 2.72, 0);
+          for (const s of [-1, 1]) { const arm = sh(new THREE.CylinderGeometry(0.05, 0.06, 0.6, 8), marble, s * 0.3, 2.45, 0.12); arm.rotation.z = s * 0.45; arm.rotation.x = -0.4; }
+          sh(new THREE.SphereGeometry(0.11, 12, 10), sapph, 0, 2.46, 0.4);   // a great gem held before her
+          for (let i = 0; i < 5; i++) { const a = (i / 4 - 0.5) * 1.5; const cr = sh(new THREE.ConeGeometry(0.035, 0.18, 6), gold, Math.sin(a) * 0.15, 3.03 + Math.cos(a) * 0.02, Math.cos(a) * 0.04); cr.rotation.z = -a * 0.6; sh(new THREE.SphereGeometry(0.03, 8, 6), [ruby, emer, sapph, emer, ruby][i], Math.sin(a) * 0.16, 3.17, 0.0); }   // crown
+          const halo = sh(new THREE.TorusGeometry(0.34, 0.018, 8, 36), gold, 0, 2.95, -0.18); halo.rotation.x = 0.15;
+          for (const s of [-1, 1]) for (let k = 0; k < 6; k++) { const len = 0.9 - k * 0.09, f = sh(new THREE.BoxGeometry(len, 0.09, 0.018), k % 2 ? gold : bronze, s * (0.26 + len / 2 * 0.85), 2.62 + k * 0.1 - 0.1, -0.22); f.rotation.z = s * (0.28 + k * 0.1); f.position.x = s * (0.28 + Math.cos(0.28 + k * 0.1) * len / 2); f.position.y = 2.5 + k * 0.12 + Math.sin(0.28 + k * 0.1) * len / 2 * 0.6; }   // layered gilded wing feathers
+          for (const s of [-1, 1]) sh(new THREE.OctahedronGeometry(0.06), amethyst, s * 0.34, 2.55, -0.22);
+          return o; },
+        sign: (t) => RC.Signs.post(THREE, t, M),   // (its words on the board, both faces: rc-signs.js)
+        noticeboard: (t) => {   // a roofed stand, notes on both sides: this board's own on the front, the town's other news on the back
+          const others = realm.things.filter((o) => o.kind === 'noticeboard' && o !== t).flatMap((o) => o.lines || []);
+          const back = { title: 'WORK · LOST & FOUND · NEWS', lines: others.slice(0, 4).concat(['LOST: a grey cat, answers to Pip. Bring her to the Herbalist for a reward.', 'MARKET every Saturday on the plaza, from first light.']).slice(0, 6) };
+          return RC.Signs.kiosk(THREE, t, back, M); },
         tablet: () => box(0.9, 1.2, 0.25, mats.stone),
         crates: () => { const o = new THREE.Group(); o.add(box(0.6, 0.6, 0.6, M('#a2703f'))); o.add(box(0.55, 0.55, 0.55, M('#8d5f33'), 0.6, 0, 0.1)); o.add(box(0.5, 0.5, 0.5, M('#a2703f'), 0.25, 0.6, 0)); return o; },
         dock_cargo: () => { const o = new THREE.Group(); for (let i = 0; i < 3; i++) o.add(cyl(0.3, 0.3, 0.7, M('#7a4a22'), 10, i * 0.65 - 0.65)); o.add(box(0.6, 0.6, 0.6, M('#a2703f'), 0, 0, 0.7)); return o; },
@@ -265,9 +351,27 @@
         chest: () => { const o = new THREE.Group(); o.add(box(0.7, 0.4, 0.45, M('#8b5a2b'))); const lid = box(0.72, 0.16, 0.47, M('#6b4226'), 0, 0.4, 0); lid.name = 'lid'; o.add(lid); o.add(box(0.12, 0.14, 0.05, mats.brass, 0, 0.32, 0.24)); return o; },
         forage: (t) => { if (t.node === 'mushroom') { const o = RC.Mushrooms.cluster(THREE, t.mush, Math.floor(t.x * 13 + t.z * 7), mushMats); if (t.onTrunk) o.rotation.y = Math.atan2(Math.cos(t.face), Math.sin(t.face)); if (o.userData.glowMat) glowMats.add(o.userData.glowMat); return o; }
           const o = new THREE.Group(); const n = t.node;
-          if (/vein/.test(n)) { const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 0), M('#7b7f86', { flatShading: true })); rock.position.y = 0.25; o.add(rock); for (let i = 0; i < 4; i++) { const s = new THREE.Mesh(new THREE.OctahedronGeometry(0.08), M(n.startsWith('silver') ? '#e5e7eb' : n.startsWith('obsidian') ? '#1f1530' : '#b4693a', { metalness: 0.6, roughness: 0.3 })); s.position.set((RC.hash(i, 1, 9) - 0.5) * 0.6, 0.3 + RC.hash(i, 2, 9) * 0.3, 0.3); o.add(s); } }
+          if (/vein/.test(n)) {   // a rock to break with a pick: lumpy grey stone with metal showing through in seams, flecks and crystals; each metal its own colour
+            const metal = n.replace(/_vein.*/, ''), ORE = { iron: ['#8a6a58', 0.7, 0.45], nickel: ['#b9bfc2', 0.85, 0.35], copper: ['#c8703c', 0.9, 0.3], silver: ['#e3e7ee', 0.95, 0.2], gold: ['#f0c23a', 1, 0.2], titanium: ['#7e8da0', 0.9, 0.3], extensium: ['#6df0ff', 0.4, 0.15], obsidian: ['#1f1530', 0.3, 0.15] }[metal] || ['#b4693a', 0.8, 0.3];
+            const sd = Math.floor(t.x * 31 + t.z * 17), rr = RC.rng(sd + 5), geo = new THREE.IcosahedronGeometry(0.5, 2), gp = geo.attributes.position;
+            for (let i = 0; i < gp.count; i++) { const x = gp.getX(i), y = gp.getY(i), z = gp.getZ(i), k = 1 + (RC.vnoise(x * 4 + sd, z * 4, 1, 90 + sd % 7) - 0.5) * 0.55 + (RC.vnoise(x * 9, y * 9 + sd, 1, 95) - 0.5) * 0.15; gp.setXYZ(i, x * k * 1.15, Math.max(-0.08, y * k * 0.85), z * k); }
+            geo.computeVertexNormals();
+            const rk = new THREE.Mesh(geo, M('#757a80', { map: GRAN.map, normalMap: GRAN.normalMap, roughness: 0.95, flatShading: false })); rk.position.y = 0.04; rk.castShadow = rk.receiveShadow = true; o.add(rk);
+            const oreM = M(ORE[0], { metalness: ORE[1], roughness: ORE[2], emissive: metal === 'extensium' ? ORE[0] : '#000000', emissiveIntensity: metal === 'extensium' ? 0.9 : 0 });
+            const glow = metal === 'extensium' ? oreM : null; if (glow) glowMats.add(glow);
+            for (let i = 0; i < 9; i++) { const a = rr() * 6.28, hgt = 0.12 + rr() * 0.4, rad = 0.38 + rr() * 0.1, big = i < 4, c2 = new THREE.Mesh(big ? new THREE.OctahedronGeometry(0.05 + rr() * 0.06) : new THREE.BoxGeometry(0.05, 0.03, 0.05), oreM);
+              c2.scale.y = big ? 1.5 + rr() : 1; c2.position.set(Math.cos(a) * rad, hgt, Math.sin(a) * rad); c2.rotation.set(rr() * 3, rr() * 3, rr() * 3); c2.castShadow = true; o.add(c2); }
+            for (let i = 0; i < 3; i++) { const sm = new THREE.Mesh(new THREE.BoxGeometry(0.34 + rr() * 0.12, 0.02, 0.025), oreM); const a = rr() * 6.28; sm.position.set(Math.cos(a) * 0.3, 0.2 + rr() * 0.2, Math.sin(a) * 0.3); sm.rotation.y = -a + Math.PI / 2; sm.rotation.z = (rr() - 0.5) * 0.9; o.add(sm); }   // seams
+          }
           else if (n === 'timber_pile') for (let i = 0; i < 3; i++) { const l = cyl(0.12, 0.12, 0.9, M('#8b5a2b'), 8); l.rotation.z = Math.PI / 2; l.position.set(0, 0.12 + (i === 2 ? 0.22 : 0) - 0.45, (i - 1) * 0.25 * (i === 2 ? 0 : 1)); o.add(l); }
-          else if (n === 'fruit_tree') { o.add(cyl(0.08, 0.12, 1.2, M('#6b4226'), 6)); const c = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6, 0), M('#4ca04a', { flatShading: true })); c.position.y = 1.5; o.add(c); for (let i = 0; i < 5; i++) { const a = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 4), M('#dc2626')); a.position.set((RC.hash(i, 7, 7) - 0.5) * 0.9, 1.3 + RC.hash(i, 8, 8) * 0.5, (RC.hash(i, 9, 9) - 0.5) * 0.9); o.add(a); } }
+          else if (n === 'fruit_tree') {   // a real grown tree (same maker as the woods) with apples hanging in it
+            const sd = Math.floor(t.x * 11 + t.z * 5) + 3, ft = RC.Flora.tree(THREE, 'oak', sd, 1), sp = RC.Flora.SPECIES.oak, tint = new THREE.Color('#62a043');
+            const bk = new THREE.Mesh(ft.bark, floraMats.barkMat(sp.bark)); bk.castShadow = true; o.add(bk);
+            const lm = floraMats.leafMat(sp.leaf, 0.05), lf = new THREE.Mesh(ft.leaves, lm); lf.customDepthMaterial = lm.userData.depth; lf.castShadow = true; o.add(lf);
+            for (const geo of [ft.leaves, ft.fill]) { if (!geo) continue; const c = geo.attributes.color; for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) * tint.r, c.getY(i) * tint.g, c.getZ(i) * tint.b); }
+            if (ft.fill) { const fm = new THREE.Mesh(ft.fill, floraMats.fillMat(sp.leaf)); fm.castShadow = true; o.add(fm); }
+            const ap = M('#c8321e', { roughness: 0.45 });
+            for (let i = 0; i < 9; i++) { const a = RC.hash(i, 7, 7) * 6.28, rr = 0.45 + RC.hash(i, 8, 8) * 0.55, s = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), ap); s.position.set(Math.cos(a) * rr, 1.2 + RC.hash(i, 9, 9) * 0.8, Math.sin(a) * rr); o.add(s); } }
           else { const c = { herb_patch: '#5fbf5a', berry_bush: '#2f7d32', mushroom_ring: '#d9b38c', beehive_log: '#b7791f', relic_scrap: '#8c8f99' }[n] || '#5fbf5a'; for (let i = 0; i < 5; i++) { const s = new THREE.Mesh(n === 'mushroom_ring' ? new THREE.ConeGeometry(0.09, 0.12, 7) : new THREE.SphereGeometry(0.09, 6, 4), M(c)); const a = i * 1.26; s.position.set(Math.cos(a) * 0.25, 0.1, Math.sin(a) * 0.25); o.add(s); } }
           return o; },
         station: (t) => { const o = new THREE.Group();
