@@ -140,8 +140,9 @@
         dirt *= 1 - forest; const sum = cob + dirt + forest + sand, k = sum > 1 ? 1 / sum : 1;
         d[i] = cob * k * 255; d[i + 1] = dirt * k * 255; d[i + 2] = forest * k * 255; d[i + 3] = sand * k * 255;
       }
-      g.putImageData(img, 0, 0);
-      const tx = new THREE.CanvasTexture(cv); tx.premultiplyAlpha = false; tx.colorSpace = THREE.NoColorSpace; tx.minFilter = THREE.LinearFilter; tx.generateMipmaps = false; return tx;
+      // raw data, not a canvas: a canvas wipes the colour channels wherever the fourth (sand) is zero
+      const tx = new THREE.DataTexture(new Uint8Array(d.buffer.slice(0)), W * S, H * S, THREE.RGBAFormat); this._splat = tx;
+      tx.colorSpace = THREE.NoColorSpace; tx.minFilter = tx.magFilter = THREE.LinearFilter; tx.generateMipmaps = false; tx.flipY = false; tx.needsUpdate = true; return tx;
     }
     // the ground picture: P pixels per cell, each letter painted its own way, plus a height picture for relief
     paintTexture(THREE) {
