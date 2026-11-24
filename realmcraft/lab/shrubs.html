@@ -26,6 +26,7 @@
 <script src="../js/rc-textures.js"></script>
 <script src="../js/rc-flora.js"></script>
 <script src="../js/rc-covers.js"></script>
+<script src="../js/rc-mushrooms.js"></script>
 <script>
 (function () {
   const T = THREE;
@@ -57,9 +58,19 @@
     grp.position.set(x, 0, 0); scene.add(grp); spots.push({ k, x, grp });
     const tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = k.replace('_', ' '); document.body.append(tag); tags.push(tag);
   });
+  // mushrooms: a row of every kind (shelf fungus on a stump of real bark), each with its name
+  const mushMats = {}, MK = Object.keys(RC.Mushrooms.KINDS);
+  MK.forEach((k, i) => {
+    const x = (i - (MK.length - 1) / 2) * 1.6, z = 3.2, o = RC.Mushrooms.cluster(T, k, 11 + i * 7, mushMats);
+    if (k === 'shelf_fungus') { const stump = new T.Mesh(new T.CylinderGeometry(0.22, 0.26, 1.6, 14), mats.barkMat('oak')); stump.position.set(x, 0.8, z - 0.24); stump.castShadow = true; scene.add(stump); o.position.set(x, 0, z - 0.02); }
+    else o.position.set(x, 0, z);
+    o.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); scene.add(o);
+    spots.push({ k: RC.Mushrooms.KINDS[k].name, x, z, grp: o, mush: true });
+    const tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = RC.Mushrooms.KINDS[k].name; document.body.append(tag); tags.push(tag);
+  });
   // grass: the town's covers; meadow all round with bare patches, taller and packed at the foot of each shrub
   const shared2 = shared; shared2.uRain = { value: 0 };
-  const nearShrub = (x, z) => Math.min(...spots.map((s) => Math.hypot(x - s.x, z) - 0.55));
+  const nearShrub = (x, z) => Math.min(...spots.map((s) => Math.hypot(x - s.x, z - (s.z || 0)) - (s.mush ? 0.25 : 0.55)));
   const coverPatch = (k, mask, density) => { const R = RC.Covers.RECIPES[k], m = new T.Mesh(RC.Covers.build(T, R, 26, 14, k.length, mask, { density }), RC.Covers.material(T, shared2, R.rigid)); m.receiveShadow = true; m.castShadow = true; scene.add(m); };
   coverPatch('meadow', (x, z) => { const d = nearShrub(x, z); return d < 0.05 ? 0 : 0.75 * RC.smooth01((RC.Covers.vnoise(x + 30, z + 30, 2.4, 5) - 0.2) / 0.3); }, 0.45);
   coverPatch('summer_tall', (x, z) => { const d = nearShrub(x, z); return d < 0.05 ? 0 : 1 - RC.smooth01((d - 0.1) / 0.9); }, 0.5);
@@ -79,7 +90,7 @@
   cv.addEventListener('wheel', (e) => { view.dist = RC.clamp(view.dist * (1 + Math.sign(e.deltaY) * 0.12), 0.35, 60); e.preventDefault(); }, { passive: false });
   // bar: go to each shrub, wind, time of day
   const bar = document.getElementById('bar'), btns = [];
-  const goTo = (s) => { view.target.set(s.x, 0.45, 0); view.dist = 2.6; btns.forEach((b) => b.classList.toggle('on', b._s === s)); };
+  const goTo = (s) => { view.target.set(s.x, s.mush ? 0.12 : 0.45, s.z || 0); view.dist = s.mush ? 1.1 : 2.6; btns.forEach((b) => b.classList.toggle('on', b._s === s)); };
   for (const s of spots) { const b = document.createElement('button'); b.textContent = s.k.replace('_', ' '); b._s = s; b.onclick = () => goTo(s); bar.append(b); btns.push(b); }
   const all = document.createElement('button'); all.textContent = 'all'; all.onclick = () => { view.target.set(0, 0.4, 0); view.dist = 12; btns.forEach((b) => b.classList.remove('on')); }; bar.append(all);
   const slider = (label, min, max, val, fn) => { const l = document.createElement('label'); const i = document.createElement('input'); i.type = 'range'; i.min = min; i.max = max; i.step = 'any'; i.value = val; i.oninput = () => fn(+i.value); l.append(label, i); bar.append(l); fn(val); };
@@ -91,7 +102,7 @@
     const t = clock.getElapsedTime(); shared.uTime.value = t; shared.uWind.value.set(Math.sin(t * 0.2) * 0.3 * windK, 0.1 * windK, windK);
     const a = ((hour - 6) / 12) * Math.PI, sy = Math.sin(a); su.sunPosition.value.set(Math.cos(a) * 100, sy * 100, 40); sun.position.set(Math.cos(a) * 30, Math.max(2, sy * 30), 14); sun.intensity = 0.4 + Math.max(0, sy) * 2; sun.color.set(sy < 0.35 ? '#ffc48a' : '#fff1dc');
     const h = view.dist * Math.cos(view.pitch); cam.position.set(view.target.x + Math.sin(view.yaw) * h, view.target.y + view.dist * Math.sin(view.pitch), view.target.z + Math.cos(view.yaw) * h); cam.lookAt(view.target);
-    spots.forEach((s, i) => { const v = new T.Vector3(s.x, 1.25, 0).project(cam); tags[i].style.display = v.z < 1 && view.dist < 30 ? '' : 'none'; tags[i].style.left = (v.x + 1) / 2 * innerWidth + 'px'; tags[i].style.top = (1 - v.y) / 2 * innerHeight + 'px'; });
+    spots.forEach((s, i) => { const v = new T.Vector3(s.x, s.mush ? 0.5 : 1.25, s.z || 0).project(cam); tags[i].style.display = v.z < 1 && view.dist < 30 ? '' : 'none'; tags[i].style.left = (v.x + 1) / 2 * innerWidth + 'px'; tags[i].style.top = (1 - v.y) / 2 * innerHeight + 'px'; });
     comp.render(); requestAnimationFrame(frame);
   })();
   window.LAB = { view, goTo, spots };

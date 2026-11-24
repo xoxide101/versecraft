@@ -21,6 +21,26 @@
     bell: [[0, 1.1], [0.35, 1.02], [0.62, 0.75], [0.8, 0.35], [0.86, 0]],
     trumpet: [[0.2, 0.05], [0.5, 0.22], [0.85, 0.42], [1, 0.5], [0.96, 0.42]],
   };
+  const surf = {};
+  function mushTex(T, kind, part) {
+    const key = kind + part; if (surf[key]) return surf[key];
+    const S = 256, cv = document.createElement('canvas'); cv.width = cv.height = S; const g = cv.getContext('2d'), r = RC.rng(kind.length * 31 + part.length);
+    if (part === 'cap') {   // lathe uv: u round the cap, v from the top (0) to the rim (1)
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, S, S);
+      for (let i = 0; i < 900; i++) { const v = r(); g.fillStyle = v < 0.5 ? `rgba(70,50,35,${r() * 0.14})` : `rgba(255,250,240,${r() * 0.16})`; g.beginPath(); g.ellipse(r() * S, r() * S, 2 + r() * 10, 1 + r() * 4, 0, 0, 7); g.fill(); }
+      for (let i = 0; i < 160; i++) { const x = r() * S; g.strokeStyle = `rgba(60,40,30,${0.05 + r() * 0.1})`; g.lineWidth = 0.6 + r(); g.beginPath(); g.moveTo(x, S * 0.15); g.lineTo(x + (r() - 0.5) * 6, S); g.stroke(); }   // streaks toward the rim
+      const gr = g.createLinearGradient(0, 0, 0, S); gr.addColorStop(0, 'rgba(40,25,15,.28)'); gr.addColorStop(0.5, 'rgba(0,0,0,0)'); gr.addColorStop(0.92, 'rgba(255,245,225,.18)'); gr.addColorStop(1, 'rgba(60,40,25,.25)'); g.fillStyle = gr; g.fillRect(0, 0, S, S);
+    } else if (part === 'gill') {   // circle uv: fine lines out from the middle
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, S, S);
+      for (let i = 0; i < 220; i++) { const a = (i / 220) * 6.283, len = i % 2 ? 0.48 : 0.3 + r() * 0.1; g.strokeStyle = 'rgba(60,45,35,.35)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(S / 2 + Math.cos(a) * S * 0.08, S / 2 + Math.sin(a) * S * 0.08); g.lineTo(S / 2 + Math.cos(a) * S * len, S / 2 + Math.sin(a) * S * len); g.stroke(); }
+      g.fillStyle = 'rgba(40,30,20,.35)'; g.beginPath(); g.arc(S / 2, S / 2, S * 0.08, 0, 7); g.fill();
+    } else {   // stem: fibres up the length, a darker foot
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, S, S);
+      for (let i = 0; i < 300; i++) { const x = r() * S; g.strokeStyle = `rgba(${r() < 0.5 ? '90,70,50' : '255,250,240'},${0.06 + r() * 0.12})`; g.lineWidth = 0.5 + r() * 1.2; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + (r() - 0.5) * 4, S); g.stroke(); }
+      const gr = g.createLinearGradient(0, S, 0, 0); gr.addColorStop(0, 'rgba(60,45,30,.45)'); gr.addColorStop(0.3, 'rgba(60,45,30,0)'); g.fillStyle = gr; g.fillRect(0, 0, S, S);
+    }
+    const tx = new T.CanvasTexture(cv); tx.colorSpace = T.SRGBColorSpace; tx.anisotropy = 4; return (surf[key] = tx);
+  }
   RC.Mushrooms = {
     KINDS,
     // where clusters grow in a realm: forest floor by noise, tree roots, meadow edges; shelves on some trunks
@@ -51,7 +71,7 @@
     cluster(T, kindName, seed, mats) {
       const K = KINDS[kindName], r = RC.rng(seed), g = new T.Group(), n = K.n[0] + Math.floor(r() * (K.n[1] - K.n[0] + 1));
       const M = (c, o) => mats[c + (o ? JSON.stringify(o) : '')] || (mats[c + (o ? JSON.stringify(o) : '')] = new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.75 }, o || {})));
-      const capM = K.glow ? M(K.capC, { emissive: K.glow, emissiveIntensity: 0.0 }) : M(K.capC), gillM = M(K.gill), stemM = M(K.stem || K.gill);
+      const capM = K.glow ? M(K.capC, { emissive: K.glow, emissiveIntensity: 0.0 }) : M(K.capC), gillM = M(K.gill, { map: mushTex(T, kindName, 'gill') }), stemM = M(K.stem || K.gill);
       if (K.glow) g.userData.glowMat = capM;
       // cap shading by vertex colour: darker in the middle, lighter toward the rim (and a pale band at the edge)
       const shade = (ge, base, rimLight, centreDark, bands) => {
@@ -65,7 +85,7 @@
         }
         ge.setAttribute('color', new T.BufferAttribute(col, 3)); return ge;
       };
-      const VC = (key) => mats['vc' + kindName + key] || (mats['vc' + kindName + key] = new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, emissive: K.glow || '#000000', emissiveIntensity: 0 }));
+      const VC = (key) => mats['vc' + kindName + key] || (mats['vc' + kindName + key] = new T.MeshStandardMaterial({ vertexColors: true, map: mushTex(T, kindName, key === 'stem' ? 'stem' : 'cap'), roughness: kindName === 'ember_toadstool' || kindName === 'ink_cap' ? 0.38 : 0.72, emissive: K.glow || '#000000', emissiveIntensity: 0 }));   // (slimy caps catch the light)
       if (K.shelf) {   // brackets up the trunk: each its own size and colour, some banded like turkey-tail, now and then two side by side
         const SHELF = [['#b07a3a', 0.6, 0], ['#d0782a', 0.5, 0], ['#e8dcc4', 0.3, 0], ['#5a3a24', 0.4, 0], ['#8a6a4a', 0.4, 5], ['#6a5a50', 0.3, 6]];
         const pickC = SHELF[Math.floor(r() * SHELF.length)];
@@ -87,10 +107,10 @@
         const s = (K.size[0] + r() * (K.size[1] - K.size[0])) * GROW * (i === 0 ? 1.15 : 0.6 + r() * 0.5), a = r() * 6.28, d = ((K.tight ? 0.03 : 0.06) + r() * (K.tight ? 0.05 : 0.12) * (i ? 1 : 0.2)) * GROW;
         const stemH = s * (K.tall ? 2.6 : K.cap === 'trumpet' ? 0.9 : 1.5) * (0.8 + r() * 0.4), lean = (r() - 0.5) * 0.35 + (i ? 0.15 : 0), m = new T.Group();
         const stem = new T.Mesh(shade(new T.CylinderGeometry(s * (K.thick ? 0.32 : 0.16), s * (K.thick ? 0.42 : 0.2), stemH, 8), K.stem || K.gill, 0, -0.15, 0), VC('stem')); stem.position.y = stemH / 2; stem.castShadow = true; m.add(stem);
-        const pts = prof.map(([px, py]) => new T.Vector2(px * s, py * s)), cap = new T.Mesh(shade(new T.LatheGeometry(pts, 16), K.capC, K.cap === 'parasol' ? 0.2 : 0.6, 0.35, 0), VC('cap')); cap.position.y = stemH - s * 0.05; cap.castShadow = true; m.add(cap);
+        const pts = prof.map(([px, py]) => new T.Vector2(px * s, py * s)).reverse(), cap = new T.Mesh(shade(new T.LatheGeometry(pts, 16), K.capC, K.cap === 'parasol' ? 0.2 : 0.6, 0.35, 0), VC('cap')); cap.position.y = stemH - s * 0.05; cap.castShadow = true; m.add(cap);
         if (K.glow) g.userData.glowMat = VC('cap');
         if (K.cap !== 'trumpet') { const gill = new T.Mesh(new T.CircleGeometry(s * (K.cap === 'bell' ? 0.84 : 0.96), 16).rotateX(Math.PI / 2), gillM); gill.position.y = stemH - s * 0.04; m.add(gill); }
-        if (K.spots) for (let k = 0; k < 9; k++) { const sa = r() * 6.28, sr = 0.15 + r() * 0.6, sp = new T.Mesh(new T.SphereGeometry(s * 0.08, 5, 3), M(K.spots)); const py = prof.reduce((acc, [px, py2], j) => (j && px >= sr && acc == null ? py2 : acc), null) || prof[0][1]; sp.position.set(Math.cos(sa) * sr * s, stemH + py * s * 0.95, Math.sin(sa) * sr * s); sp.scale.y = 0.5; m.add(sp); }
+        if (K.spots) for (let k = 0; k < 9; k++) { const sa = r() * 6.28, sr = 0.15 + r() * 0.6, sp = new T.Mesh(new T.SphereGeometry(s * 0.08, 5, 3), M(K.spots)); const py = prof.reduce((acc, [px, py2], j) => (j && px >= sr && acc == null ? py2 : acc), null) || prof[0][1]; sp.position.set(Math.cos(sa) * sr * s, stemH + py * s * 1.0, Math.sin(sa) * sr * s); sp.scale.y = 0.45; m.add(sp); }
         m.position.set(Math.cos(a) * d, 0, Math.sin(a) * d); m.rotation.set(Math.sin(a) * lean, r() * 6.28, -Math.cos(a) * lean); g.add(m);
       }
       return g;
