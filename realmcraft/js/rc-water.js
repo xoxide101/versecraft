@@ -26,7 +26,7 @@
       g += vec2(wN(q + vec2(e, 0.0)) + wN((q + vec2(e, 0.0)) * 2.3 - uTime * 0.3) * 0.5 - n0, wN(q + vec2(0.0, e)) + wN((q + vec2(0.0, e)) * 2.3 - uTime * 0.3) * 0.5 - n0) / e * 0.012 * ws;
       if (uRain > 0.02) { g += rings(p, 0.55, 0.0) + rings(p + 0.27, 0.7, 11.0) * 0.8 + rings(p - 0.41, 0.45, 23.0) * 0.7; }
       // depth below the surface: shallow and clear at the shore, dark and deep out at sea (off the map: deep)
-      vec2 uv = p / uMapSize; float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
+      vec2 uv = p / uMapSize; float inside = smoothstep(0.0, 0.04, uv.x) * (1.0 - smoothstep(0.96, 1.0, uv.x)) * smoothstep(0.0, 0.04, uv.y) * (1.0 - smoothstep(0.96, 1.0, uv.y));   // (fades out toward the map's edge: no false shoreline there)
       float d = mix(3.0, texture2D(tDepth, uv).r * 2.55, inside);
       g *= 0.35 + 0.65 * smoothstep(0.0, 0.6, d);   // (calmer right in the shallows)
       vec3 nW = normalize(vec3(-g.x, 1.0, -g.y)); normal = normalize((viewMatrix * vec4(nW, 0.0)).xyz);

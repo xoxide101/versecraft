@@ -306,6 +306,7 @@
       if (eaves.length) g.add(RC.EaveDrips(THREE, eaves, shared));
       { const solid = realm.things.filter((x) => x.kind !== 'forage'), near = (x, z) => solid.some((o) => o.kind === 'building' ? x > o.x - 1 && x < o.x + o.w + 1 && z > o.z && z < o.z + o.d + 1.5 : Math.abs(o.x - x) < 1.2 && Math.abs(o.z - z) < 1.2);
         g.add(RC.Mounds(THREE, realm, terrain, near)); }   // molehills, sandy heaps, lumps of earth
+      RC.Boats.place(THREE, realm, terrain, g, tickers);   // the boats, moored along the piers (rc-boats.js)
       // ---- the smaller things
       const PR = RC.Props.make({ T: THREE, M, woodM, mats, GRANM, beamM, shared, tickers });   // (rc-props.js)
       let LP = null;
@@ -491,12 +492,13 @@
           st.addStep(t.x, t.z, 0.5, top);
           // the way out: from the rock toward the closest dry ground, a stone every 0.6 m or so
           let bx = null, bz = null; for (let r = 0.6; r < 8 && bx == null; r += 0.2) for (let a = 0; a < 6.28; a += 0.2) { const x = t.x + Math.cos(a) * r, z = t.z + Math.sin(a) * r; if (!st.wet(x, z, 0.15)) { bx = x; bz = z; break; } }
-          if (bx != null) { const L = Math.hypot(bx - t.x, bz - t.z), n = Math.max(1, Math.round((L - 0.4) / 0.62));
-            for (let k = 1; k <= n; k++) { const f = (k / (n + 0.6)), x = t.x + (bx - t.x) * f + (RC.hash(k, t.x, 3) - 0.5) * 0.18, z = t.z + (bz - t.z) * f + (RC.hash(k, t.z, 4) - 0.5) * 0.18, sy = wl + 0.07;
-              const s = new THREE.Mesh(RC.roughBox(THREE, 0.46, 0.3, 0.42, 0.06, RC.rng(k * 7 + t.x)), rockM); s.position.set(x, sy - 0.15, z); s.rotation.y = RC.hash(k, 9, 1) * 3; s.castShadow = s.receiveShadow = true; g.add(s); st.addStep(x, z, 0.26, sy); } }
+          if (bx != null) { const L = Math.hypot(bx - t.x, bz - t.z), n = Math.max(2, Math.round((L - 0.3) / 0.4));   // (close together, so they read as a path)
+            for (let k = 1; k <= n; k++) { const f = (k / (n + 0.35)), x = t.x + (bx - t.x) * f + (RC.hash(k, t.x, 3) - 0.5) * 0.1, z = t.z + (bz - t.z) * f + (RC.hash(k, t.z, 4) - 0.5) * 0.1, sy = wl + 0.07;
+              const s = new THREE.Mesh(RC.roughBox(THREE, 0.5, 0.3, 0.46, 0.06, RC.rng(k * 7 + t.x)), rockM); s.position.set(x, sy - 0.15, z); s.rotation.y = RC.hash(k, 9, 1) * 3; s.castShadow = s.receiveShadow = true; g.add(s); st.addStep(x, z, 0.26, sy); } }
         }
+        if (t.kind === 'boat') continue;
         const o = make[t.kind](t); o.userData.thing = t;
-        if (t.kind === 'boat') { o.position.set(t.x, terrain.waterY, t.z); o.traverse((m) => { if (m.isMesh) m.castShadow = true; }); g.add(o); const ph = RC.hash(t.x, t.z, 1) * 6; tickers.push((tm2) => { o.position.y = terrain.waterY - 0.05 + Math.sin(tm2 * 1.3 + ph) * 0.06; o.rotation.z = Math.sin(tm2 * 1.1 + ph) * 0.04; }); continue; }
+        if (t.kind === 'boat') continue;   // (boats are tied up at the piers: rc-boats.js, below)
         add(o, t.x, t.z, t.kind === 'sign' || t.kind === 'noticeboard' ? 0 : 0);
         t._obj = o;
         if (t.kind === 'station') label(t.title, t.x, Y(t.x, t.z) + 1.9, t.z, 'station');

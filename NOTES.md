@@ -1,7 +1,7 @@
 # VerseCraft
 
 A way to tell any story by letting people walk into it: fairy tales, books, board games, history, games from any year (text or not).
-Runs in the browser on phones, tablets, computers and consoles. Local git only for now (no GitHub until the owner says so).
+Runs in the browser on phones, tablets, computers and consoles. On GitHub from 2026-11-24 (save point); how the engine works: [docs/ENGINE.md](docs/ENGINE.md).
 
 ## The layers
 | Layer | What it holds |

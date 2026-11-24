@@ -241,7 +241,7 @@
       const k = P[r][c]; if (k !== '.' && k !== ',') continue;
       const h = RC.hash(c, r, 91), h2 = RC.hash(r, c, 92), edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dc, dr]) => at(c + dc, r + dr) === 'T'), wet = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dc, dr]) => at(c + dc, r + dr) === '~');
       const x = c + 0.2 + h2 * 0.6, z = r + 0.2 + RC.hash(c * 3, r, 93) * 0.6;
-      if (terrain.stream && terrain.stream.clear(x, z, 0.4)) continue;
+      if (terrain.stream && (terrain.stream.clear(x, z, 0.4) || terrain.stream.decks.some((d) => x > d.x0 - 0.9 && x < d.x1 + 0.9 && z > d.z0 - 0.9 && z < d.z1 + 0.9))) continue;   // (nothing growing on a bridge or its ends)
       if (wet && h < 0.55) brush.reed.push([x, z, h]);
       else if (edge && h < 0.6) brush[h < 0.22 ? 'fern' : h < 0.36 ? 'bush' : h < 0.44 ? 'sapling' : h < 0.52 ? 'berry' : 'rock'].push([x, z, h2]);
       else if (k === '.' && h < 0.075) brush[h < 0.025 ? 'bush' : h < 0.045 ? 'fern' : h < 0.06 ? 'rock' : 'blossom'].push([x, z, h2]);
