@@ -136,9 +136,9 @@
     return { leaves: M(out), fill: fill.length ? M(fill) : null, bark: stems.length ? M(stems) : null, leaf: b.leaf, color: b.color };
   };
   RC.Flora.rock = function (T, seed) {
-    const r = RC.rng(seed * 61 + 5), ge = new T.IcosahedronGeometry(0.5, 2), p = ge.attributes.position;
+    const r = RC.rng(seed * 61 + 5), ge = T.BufferGeometryUtils.mergeVertices(new T.IcosahedronGeometry(0.5, 5)), p = ge.attributes.position;   // (smooth, then lumped by two scales of noise below)
     const sx = 0.8 + r() * 0.8, sy = 0.45 + r() * 0.35, sz = 0.7 + r() * 0.6;
-    for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), n = 1 + (RC.hash(Math.round(x * 9), Math.round(y * 9) + Math.round(z * 9) * 7, seed) - 0.5) * 0.35; p.setXYZ(i, x * sx * n, Math.max(-0.1, y * sy * n), z * sz * n); }
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), n = 1 + (RC.hash(Math.round(x * 4), Math.round(y * 4) + Math.round(z * 4) * 7, seed) - 0.5) * 0.3 + (RC.hash(Math.round(x * 14), Math.round(y * 14) + Math.round(z * 14) * 5, seed + 1) - 0.5) * 0.08; p.setXYZ(i, x * sx * n, Math.max(-0.1, y * sy * n), z * sz * n); }
     ge.computeVertexNormals();
     const col = new Float32Array(p.count * 3); for (let i = 0; i < p.count; i++) { const up = ge.attributes.normal.getY(i), moss = RC.clamp((up - 0.55) * 2.5, 0, 1); col[i * 3] = RC.lerp(0.62, 0.42, moss); col[i * 3 + 1] = RC.lerp(0.6, 0.6, moss); col[i * 3 + 2] = RC.lerp(0.57, 0.3, moss); }
     ge.setAttribute('color', new T.BufferAttribute(col, 3)); return ge;
@@ -147,7 +147,7 @@
   // ---------------------------------------------------------------- materials (shared, swaying)
   RC.Flora.materials = function (T, shared) {
     // wind: whole plants lean and sway with height; leaves also flutter (bark never moves)
-    const sway = (mat, strength, flutter = true) => {
+    const sway = (mat, strength, flutter = true, base = 0.4) => {   // base: the height where swaying starts (0 for grass and ferns)
       mat.onBeforeCompile = (sh) => { sh.uniforms.uTime = shared.uTime; sh.uniforms.uWind = shared.uWind;
         sh.vertexShader = 'uniform float uTime; uniform vec3 uWind;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
           #ifdef USE_INSTANCING
@@ -155,13 +155,13 @@
           #else
           vec2 ip = vec2(0.0);
           #endif
-          float hgt = max(position.y - 0.4, 0.0);
+          float hgt = max(position.y - ${base.toFixed(2)}, 0.0);
           float sw = hgt * ${strength.toFixed(3)} * (0.5 + uWind.z);
           float flutter = ${flutter ? '1.0' : '0.0'} * sin(uTime * 7.0 + position.x * 9.0 + position.z * 7.0 + ip.x) * 0.012 * (0.4 + uWind.z);
           transformed.x += (sin(uTime * 1.4 + ip.x * 0.7 + ip.y * 0.3) * 0.5 + uWind.x * 0.7) * sw + flutter;
           transformed.z += (cos(uTime * 1.1 + ip.y * 0.6) * 0.35 + uWind.y * 0.7) * sw + flutter;
           transformed.y += flutter * 0.6;`); };
-      mat.customProgramCacheKey = () => 'sway' + strength + flutter; return mat;
+      mat.customProgramCacheKey = () => 'sway' + strength + flutter + base; return mat;
     };
     const leafMat = (kind, strength) => { const map = RC.Tex.leaves(T, kind); const m = sway(new T.MeshStandardMaterial({ map, alphaTest: 0.42, side: T.DoubleSide, vertexColors: true, roughness: 0.72, metalness: 0 }), strength); m.userData.depth = new T.MeshDepthMaterial({ map, alphaTest: 0.42, depthPacking: T.RGBADepthPacking }); return m; };
     const barkMat = (kind) => { const b = RC.Tex.bark(T, kind); const m = new T.MeshStandardMaterial({ map: b.map, normalMap: b.normalMap, roughness: 0.95 }); m.map.repeat.set(2, 1); m.normalMap.repeat.set(2, 1); return m; };
@@ -217,12 +217,12 @@
     // reeds and grass: crossed cards
     const clump = (w, h, n) => { const parts = []; for (let i = 0; i < n; i++) { const p = new T.PlaneGeometry(w, h, 1, 3).translate(0, h / 2, 0), pp = p.attributes.position, col = new Float32Array(pp.count * 3); for (let j = 0; j < pp.count; j++) { const t = pp.getY(j) / h; pp.setZ(j, t * t * h * 0.28); col[j * 3] = col[j * 3 + 1] = col[j * 3 + 2] = 0.72 + t * 0.4; } p.rotateY((i / n) * Math.PI * 2 + 0.3); p.setAttribute('color', new T.BufferAttribute(col, 3)); const nor = p.attributes.normal; for (let j = 0; j < nor.count; j++) nor.setXYZ(j, 0, 1, 0); parts.push(p); } return T.BufferGeometryUtils.mergeGeometries(parts); };
     const crossed = (w, h, n) => { const parts = []; for (let i = 0; i < n; i++) { const p = new T.PlaneGeometry(w, h).translate(0, h / 2, 0); p.rotateY((i / n) * Math.PI); const nor = p.attributes.normal; for (let j = 0; j < nor.count; j++) nor.setXYZ(j, 0, 1, 0); parts.push(p); } return T.BufferGeometryUtils.mergeGeometries(parts); };
-    const grassMat = mats.sway(new T.MeshStandardMaterial({ map: RC.Tex.leaves(T, 'grass'), alphaTest: 0.4, side: T.DoubleSide, roughness: 0.9, vertexColors: true }), 0.35);
+    const grassMat = mats.sway(new T.MeshStandardMaterial({ map: RC.Tex.leaves(T, 'grass'), alphaTest: 0.4, side: T.DoubleSide, roughness: 0.9, vertexColors: true }), 0.35, true, 0);
     const gm = plantSet(brush.grass, clump(0.5, 0.3, 5), grassMat, [0.75, 1.3], '#ffffff', false);
     if (gm) brush.grass.forEach(([x, z], i) => { const c = Math.floor(x), r = Math.floor(z), patch = noise(c, r, 5) * 0.6 + noise(c, r, 2) * 0.4, meadow = at(c, r) === ','; gm.setColorAt(i, col.setHSL((meadow ? 92 : 98 + patch * 10) / 360, (meadow ? 46 : 44 + patch * 10) / 100, ((meadow ? 50 : 40) + patch * 10) / 100 + 0.1)); });
-    const reedMat = mats.sway(new T.MeshStandardMaterial({ map: RC.Tex.leaves(T, 'reed'), alphaTest: 0.4, side: T.DoubleSide, roughness: 0.9 }), 0.2);
+    const reedMat = mats.sway(new T.MeshStandardMaterial({ map: RC.Tex.leaves(T, 'reed'), alphaTest: 0.4, side: T.DoubleSide, roughness: 0.9 }), 0.2, true, 0);
     plantSet(brush.reed, crossed(0.7, 1.2, 3), reedMat, [0.8, 1.3], '#ffffff');
-    const stone = RC.Tex.surface(T, 'stone'); const rockMat = new T.MeshStandardMaterial({ vertexColors: true, map: stone.map, normalMap: stone.normalMap, roughness: 0.95 });
+    const stone = RC.Tex.surface(T, 'rock'); const rockMat = new T.MeshStandardMaterial({ vertexColors: true, map: stone.map, normalMap: stone.normalMap, roughness: 0.95 });
     plantSet(brush.rock, RC.Flora.rock(T, 4), rockMat, [0.45, 1.1], '#ffffff');
     // seasons: recolour leaves when the season turns; bare branches in winter
     let lastSeason = -1;

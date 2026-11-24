@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flora Lab</title>
+<style>
+  :root { --ink: #e8f0ff; --panel: rgba(14, 24, 52, .86); --edge: rgba(120, 160, 255, .45); --gold: #facc15; --dim: #9fb3d9; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1230; color: var(--ink); font: 13px system-ui, "Segoe UI", sans-serif; }
+  #stage { position: fixed; inset: 0; } #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .bar { position: fixed; left: 12px; top: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--panel); border: 1.5px solid var(--edge); }
+  .bar b { color: var(--gold); margin-right: 6px; } .bar button { background: #16264f; color: var(--ink); border: 1px solid var(--edge); border-radius: 6px; padding: 4px 10px; cursor: pointer; font: inherit; }
+  .bar label { display: flex; gap: 5px; align-items: center; color: var(--dim); margin-left: 6px; } .bar input[type=range] { width: 90px; }
+  .help { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); padding: 4px 12px; border-radius: 6px; background: rgba(14,24,52,.7); color: var(--dim); font-size: 12px; white-space: nowrap; }
+  .tag { position: fixed; padding: 2px 8px; border-radius: 5px; background: rgba(14,24,52,.8); border: 1px solid var(--edge); font: 700 11px ui-monospace, Consolas, monospace; text-transform: uppercase; pointer-events: none; transform: translate(-50%, -100%); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div class="bar" id="bar"><b>FLORA LAB</b></div>
+<div class="help">drag to turn · right-drag or Shift-drag to move · wheel to zoom (right down to the blades) · click a name to go there · sliders rebuild the grass</div>
+<script src="../lib/realm-libs.js"></script>
+<script src="../js/rc-core.js"></script>
+<script src="../js/rc-textures.js"></script>
+<script src="../js/rc-flora.js"></script>
+<script>
+(function () {
+  const T = THREE; RC.quality = { tier: 'high', grass: 1 };
+  const host = document.getElementById('stage'), rd = new T.WebGLRenderer({ antialias: true });
+  rd.setPixelRatio(Math.min(devicePixelRatio, 2)); rd.shadowMap.enabled = true; rd.shadowMap.type = T.PCFSoftShadowMap; rd.toneMapping = T.ACESFilmicToneMapping; rd.outputColorSpace = T.SRGBColorSpace; host.append(rd.domElement);
+  const scene = new T.Scene(), cam = new T.PerspectiveCamera(35, 1, 0.02, 400);
+  const sky = new T.Sky(); sky.scale.setScalar(300); scene.add(sky); const su = sky.material.uniforms; su.turbidity.value = 5; su.rayleigh.value = 1.6; su.mieCoefficient.value = 0.004; su.mieDirectionalG.value = 0.82;
+  scene.fog = new T.Fog('#bcd8f0', 40, 160);
+  const hemi = new T.HemisphereLight('#dbeafe', '#4d7c3a', 0.85), sun = new T.DirectionalLight('#fff1dc', 2.2); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 80 }); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.02; scene.add(hemi, sun, sun.target);
+  const shared = { uTime: { value: 0 }, uWind: { value: new T.Vector3(0.2, 0.1, 0.4) } }, mats = RC.Flora.materials(T, shared);
+  const M = (c, o) => new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.85 }, o || {}));
+
+  // ---------------------------------------------------------------- the ground: a fine grass picture with bumps (no 3D grass needed in the open)
+  const S = 1024, gc = RC.Tex.cv(S, S), gh = RC.Tex.cv(S, S), g = gc.getContext('2d'), hg = gh.getContext('2d');
+  for (let y = 0; y < S; y += 4) for (let x = 0; x < S; x += 4) { const p = RC.hash(x >> 6, y >> 6, 3) * 0.5 + RC.hash(x >> 5, y >> 5, 4) * 0.3 + RC.hash(x >> 3, y >> 3, 5) * 0.2; g.fillStyle = `hsl(${96 + p * 12}, ${40 + p * 12}%, ${34 + p * 12}%)`; g.fillRect(x, y, 4, 4); }
+  hg.fillStyle = '#707070'; hg.fillRect(0, 0, S, S);
+  for (let i = 0; i < 60000; i++) {   // thousands of tiny blades seen from above: light tips, dark gaps, each a little ridge in the bump map
+    const x = Math.random() * S, y = Math.random() * S, a = (Math.random() - 0.5) * 1.2, l = 3 + Math.random() * 7, light = Math.random();
+    g.strokeStyle = light < 0.45 ? `rgba(25,55,15,${0.25 + Math.random() * 0.3})` : `rgba(${170 + light * 60},${210 + light * 40},${110 + light * 50},${0.18 + Math.random() * 0.25})`;
+    hg.strokeStyle = light < 0.45 ? 'rgba(40,40,40,.5)' : 'rgba(210,210,210,.45)'; g.lineWidth = hg.lineWidth = 1;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.sin(a) * l, y - Math.cos(a) * l); g.stroke(); hg.beginPath(); hg.moveTo(x, y); hg.lineTo(x + Math.sin(a) * l, y - Math.cos(a) * l); hg.stroke();
+  }
+  for (let i = 0; i < 260; i++) { g.fillStyle = ['#fff7d6', '#fde047', '#f9a8d4', '#ffffff', '#c4b5fd'][i % 5]; g.beginPath(); g.arc(Math.random() * S, Math.random() * S, 1.6, 0, 7); g.fill(); }   // a few tiny flowers
+  const gt = RC.Tex.tex(T, gc); gt.repeat.set(10, 10); const gn = RC.Tex.normalFrom(T, gh, 4); gn.repeat.set(10, 10);
+  const ground = new T.Mesh(new T.PlaneGeometry(80, 80).rotateX(-Math.PI / 2), new T.MeshStandardMaterial({ map: gt, normalMap: gn, normalScale: new T.Vector2(1.2, 1.2), roughness: 0.95 })); ground.receiveShadow = true; scene.add(ground);
+
+  // ---------------------------------------------------------------- things for the grass to grow around (circles or boxes: what the grass measures distance to)
+  const stone = RC.Tex.surface(T, 'stone'), things = [], places = [];
+  const put = (o, name, x, z, shape) => { o.position.set(x, 0, z); o.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); scene.add(o); things.push(Object.assign({ x, z }, shape)); places.push({ name, x, z }); };
+  { const rk = RC.Tex.surface(T, 'rock'); const rock = new T.Mesh(RC.Flora.rock(T, 9), new T.MeshStandardMaterial({ vertexColors: true, map: rk.map, normalMap: rk.normalMap, roughness: 0.95 })); rock.scale.setScalar(2.2); const o = new T.Group(); o.add(rock); put(o, 'rock', -6, 0, { r: 1.1 }); }
+  { const o = new T.Group(); for (let i = 0; i < 6; i++) { const p = new T.Mesh(new T.CylinderGeometry(0.07, 0.08, 1.1, 7), M('#7a5230')); p.position.set(i * 0.9, 0.55, 0); o.add(p); } for (const y of [0.45, 0.85]) { const rail = new T.Mesh(new T.BoxGeometry(4.6, 0.07, 0.05), M('#8b5e34')); rail.position.set(2.25, y, 0); o.add(rail); } put(o, 'fence', -2.2, -4, { box: [-2.2, -4.1, 2.4, -3.9] }); }
+  { const w = new T.Mesh(new T.BoxGeometry(3.4, 1.1, 0.5), M('#ffffff', { map: stone.map, normalMap: stone.normalMap })); w.position.y = 0.55; const o = new T.Group(); o.add(w); put(o, 'wall', 4.5, -3.5, { box: [2.8, -3.75, 6.2, -3.25] }); }
+  { const b = RC.Tex.bark(T, 'oak'), st = new T.Mesh(new T.CylinderGeometry(0.42, 0.55, 0.55, 14), M('#ffffff', { map: b.map, normalMap: b.normalMap })); st.position.y = 0.27; const top = new T.Mesh(new T.CircleGeometry(0.42, 14).rotateX(-Math.PI / 2), M('#b48a5a')); top.position.y = 0.551; const o = new T.Group(); o.add(st, top); put(o, 'stump', 5, 3, { r: 0.55 }); }
+  { const o = new T.Group(); const p = new T.Mesh(new T.CylinderGeometry(0.04, 0.06, 2.2, 8), M('#2f343c', { metalness: 0.6, roughness: 0.4 })); p.position.y = 1.1; o.add(p); put(o, 'post', 0.5, 3.5, { r: 0.12 }); }
+  // a cobbled path across: grass grows longer along its edges
+  { const cv = RC.Tex.cv(256, 64), c = cv.getContext('2d'); c.fillStyle = '#5b5f66'; c.fillRect(0, 0, 256, 64); for (let j = 0; j < 4; j++) for (let i = 0; i < 17; i++) { c.fillStyle = `hsl(210, 8%, ${44 + Math.random() * 20}%)`; c.beginPath(); c.ellipse(i * 16 + (j % 2) * 8, j * 16 + 8, 7, 6.5, 0, 0, 7); c.fill(); }
+    const t = RC.Tex.tex(T, cv); t.repeat.set(4, 1); const path = new T.Mesh(new T.PlaneGeometry(16, 1.6).rotateX(-Math.PI / 2), M('#ffffff', { map: t })); path.position.set(0, 0.01, 7.5); path.receiveShadow = true; scene.add(path); things.push({ box: [-8, 6.7, 8, 8.3], x: 0, z: 7.5, path: true }); places.push({ name: 'path', x: 0, z: 7.5 }); }
+  const edgeDist = (x, z) => { let d = 1e9; for (const t of things) { let k; if (t.box) { const [x0, z0, x1, z1] = t.box, dx = Math.max(x0 - x, 0, x - x1), dz = Math.max(z0 - z, 0, z - z1); k = Math.hypot(dx, dz); if (dx === 0 && dz === 0) k = -1; } else k = Math.hypot(x - t.x, z - t.z) - t.r; if (k < d) d = k; } return d; };
+
+  // ---------------------------------------------------------------- grass blades as real geometry: a clump of thin curved blades, dark at the root, light at the tip
+  function bladeClump(n, seed) {
+    const r = RC.rng(seed), parts = [];
+    for (let i = 0; i < n; i++) {
+      const h = 0.18 + r() * 0.22, w = 0.012 + r() * 0.008, lean = 0.15 + r() * 0.5, a = r() * 6.28, ox = (r() - 0.5) * 0.12, oz = (r() - 0.5) * 0.12, SEG = 4;
+      const pos = [], col = [], idx = [];
+      for (let s = 0; s <= SEG; s++) { const t = s / SEG, y = h * t, bend = lean * t * t * h, ww = w * (1 - t * 0.9);
+        for (const side of [-1, 1]) { pos.push(ox + Math.cos(a) * bend + Math.sin(a) * side * ww, y, oz + Math.sin(a) * bend - Math.cos(a) * side * ww); const k = 0.5 + t * 0.45; col.push(k, k, k); } }
+      for (let s = 0; s < SEG; s++) { const q = s * 2; idx.push(q, q + 1, q + 2, q + 1, q + 3, q + 2, q, q + 2, q + 1, q + 1, q + 2, q + 3); }   // (both faces, same light)
+      const ge = new T.BufferGeometry(); ge.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); ge.setAttribute('color', new T.Float32BufferAttribute(col, 3)); ge.setIndex(idx);
+      const nor = new Float32Array(pos.length); for (let j = 0; j < nor.length; j += 3) { nor[j + 1] = 1; } ge.setAttribute('normal', new T.BufferAttribute(nor, 3)); parts.push(ge);
+    }
+    return T.BufferGeometryUtils.mergeGeometries(parts);
+  }
+  const bladeMat = mats.sway(new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 }), 0.9, false, 0);
+  const clumpGeo = bladeClump(14, 5);
+  let grassMesh = null;
+  const set = { reach: 2.2, tall: 1.0, thick: 1.0, open: 0.25 };
+  function growGrass() {
+    if (grassMesh) { scene.remove(grassMesh); grassMesh.dispose(); }
+    const list = [], r = RC.rng(11);
+    for (let i = 0; i < 90000 && list.length < 30000 * set.thick; i++) {
+      const x = (r() - 0.5) * 40, z = (r() - 0.5) * 34, d = edgeDist(x, z); if (d < 0.05) continue;
+      const near = 1 - RC.smooth01(d / set.reach);   // 1 at the foot of a thing, 0 out in the open
+      const patch = RC.hash(Math.floor(x * 0.7 + 50), Math.floor(z * 0.7 + 50), 21);   // open ground: tufts only in some patches
+      const keep = near > 0.02 ? 0.25 + near * 0.75 : patch > 1 - set.open ? 0.35 : 0;
+      if (r() > keep * set.thick) continue;
+      const size = RC.lerp(1 / 8, 1, near) * set.tall * (0.75 + r() * 0.5);
+      list.push([x, z, size, r()]);
+    }
+    const m = new T.InstancedMesh(clumpGeo, bladeMat, list.length), m4 = new T.Matrix4(), q = new T.Quaternion(), c = new T.Color(), up = new T.Vector3(0, 1, 0);
+    list.forEach(([x, z, s, h], i) => { m4.compose(new T.Vector3(x, 0, z), q.setFromAxisAngle(up, h * 40), new T.Vector3(s * (0.8 + h * 0.5), s, s * (0.8 + h * 0.5))); m.setMatrixAt(i, m4); m.setColorAt(i, c.setHSL(0.25 + h * 0.05, 0.55 + h * 0.15, 0.34 + h * 0.08)); });
+    m.receiveShadow = true; m.castShadow = false; scene.add(m); grassMesh = m; info.textContent = list.length.toLocaleString() + ' clumps';
+  }
+
+  // ---------------------------------------------------------------- ferns: fronds that arch, then curve again near the tip; some cup upward like a tulip
+  function frondGeo(len, wid, bend1, bend2, cup, r) {   // a strip that follows a path: pitch grows with t (the arch) and turns again near the tip
+    const SEG = 10, pos = [], uv = [], idx = [], col = []; let y = 0, z = 0, pitch = 0.25;
+    for (let s = 0; s <= SEG; s++) {
+      const t = s / SEG, ww = wid * Math.sin(Math.min(1, t * 1.25) * Math.PI) * (1 - t * 0.35) + 0.004;
+      for (const side of [-1, 1]) { pos.push(side * ww, y + Math.abs(side) * ww * cup * t, z); uv.push(side < 0 ? 0 : 1, t); const k = 0.8 + t * 0.3; col.push(k, k, k); }
+      const step = len / SEG; pitch += bend1 / SEG + (t > 0.62 ? bend2 * (t - 0.62) / 0.38 / SEG * 2.6 : 0);
+      y += Math.cos(pitch) * step; z += Math.sin(pitch) * step;
+    }
+    for (let s = 0; s < SEG; s++) { const q = s * 2; idx.push(q, q + 1, q + 2, q + 1, q + 3, q + 2); }
+    const ge = new T.BufferGeometry(); ge.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); ge.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); ge.setAttribute('color', new T.Float32BufferAttribute(col, 3)); ge.setIndex(idx); ge.computeVertexNormals();
+    const nor = ge.attributes.normal; for (let j = 0; j < nor.count; j++) { const x = nor.getX(j) * 0.3, y = Math.abs(nor.getY(j)) * 0.4 + 0.75, z = nor.getZ(j) * 0.3, l = Math.hypot(x, y, z); nor.setXYZ(j, x / l, y / l, z / l); }
+    const back = ge.clone(), bi = back.index.array; for (let j = 0; j < bi.length; j += 3) { const a = bi[j + 1]; bi[j + 1] = bi[j + 2]; bi[j + 2] = a; }
+    return T.BufferGeometryUtils.mergeGeometries([ge, back]);   // (both faces lit from above: no dark undersides)
+  }
+  function fern(kind, seed) {
+    const r = RC.rng(seed), parts = [], n = kind === 'tulip' ? 7 : 11 + Math.floor(r() * 4);
+    for (let i = 0; i < n; i++) {
+      let ge;
+      if (kind === 'arch') ge = frondGeo(1.15 + r() * 0.35, 0.17, 1.5 + r() * 0.4, 0.3, 0.1, r);   // one long arch
+      else if (kind === 'double') ge = frondGeo(1.2 + r() * 0.35, 0.16, 1.1 + r() * 0.3, -1.6 - r() * 0.6, 0.2, r);   // arches out, then the tip turns back up
+      else ge = frondGeo(0.9 + r() * 0.25, 0.2, 0.45 + r() * 0.2, -1.2, 0.9, r);   // tulip: upright, the tips curl in and up, cupped
+      ge.rotateY((i / n) * 6.28 + r() * 0.3); parts.push(ge);
+    }
+    return T.BufferGeometryUtils.mergeGeometries(parts);
+  }
+  const fernTex = RC.Tex.leaves(T, 'fern'); fernTex.wrapS = fernTex.wrapT = T.ClampToEdgeWrapping;
+  const fernMat = (c) => { const m = mats.sway(new T.MeshStandardMaterial({ map: fernTex, alphaTest: 0.4, vertexColors: true, color: c, roughness: 0.7 }), 0.1, true, 0); m.customProgramCacheKey = () => 'fern' + c; return m; };
+  [['arch', -3.5, 2.5, '#7cc24f'], ['double', -1.5, 2.2, '#6db847'], ['tulip', 2.2, 1.2, '#8cd05a'], ['double', -7.5, 3.5, '#b48a3a']].forEach(([k, x, z, c], i) => {
+    const f = new T.Mesh(fern(k, 3 + i), fernMat(c)); f.castShadow = true; f.customDepthMaterial = new T.MeshDepthMaterial({ map: fernTex, alphaTest: 0.4, depthPacking: T.RGBADepthPacking }); f.position.set(x, 0, z); scene.add(f); things.push({ x, z, r: 0.35 }); places.push({ name: k + ' fern', x, z });
+  });
+  // two of the round shrubs for company
+  for (const [k, x, z] of [['bush', -6, 3.6], ['blossom', 7.5, 0.5]]) {
+    const b = RC.Flora.bush(T, k, 4, 1), o = new T.Group(), lm = mats.leafMat(b.leaf, 0.06).clone(), base = mats.leafMat(b.leaf, 0.06); lm.color.set(b.color); lm.onBeforeCompile = base.onBeforeCompile; lm.customProgramCacheKey = () => 'flab' + k;
+    const lmesh = new T.Mesh(b.leaves, lm); lmesh.castShadow = true; lmesh.customDepthMaterial = base.userData.depth; o.add(lmesh);
+    if (b.fill) { const fm = mats.fillMat(b.leaf).clone(), fb = mats.fillMat(b.leaf); fm.color.set(b.color); fm.onBeforeCompile = fb.onBeforeCompile; fm.customProgramCacheKey = () => 'flabf' + k; o.add(new T.Mesh(b.fill, fm)); }
+    put(o, k, x, z, { r: 0.55 });
+  }
+
+  // ---------------------------------------------------------------- controls
+  const view = { yaw: 0.6, pitch: 0.4, dist: 14, target: new T.Vector3(0, 0.3, 1) };
+  let drag = null; const cv = rd.domElement;
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+  cv.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, pan: e.button === 2 || e.shiftKey }; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', (e) => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+    if (drag.pan) { const k = view.dist * 0.0016; view.target.x -= (Math.cos(view.yaw) * dx) * k; view.target.z += (Math.sin(view.yaw) * dx) * k; view.target.y = Math.max(0.02, view.target.y + dy * k); }
+    else { view.yaw -= dx * 0.008; view.pitch = RC.clamp(view.pitch + dy * 0.006, -0.02, 1.45); } });
+  cv.addEventListener('pointerup', () => { drag = null; });
+  cv.addEventListener('wheel', (e) => { view.dist = RC.clamp(view.dist * (1 + Math.sign(e.deltaY) * 0.12), 0.25, 60); e.preventDefault(); }, { passive: false });
+  const bar = document.getElementById('bar');
+  const goTo = (p) => { view.target.set(p.x, 0.25, p.z); view.dist = 3.2; };
+  for (const p of places) { const b = document.createElement('button'); b.textContent = p.name; b.onclick = () => goTo(p); bar.append(b); }
+  const all = document.createElement('button'); all.textContent = 'all'; all.onclick = () => { view.target.set(0, 0.3, 1); view.dist = 14; }; bar.append(all);
+  const slider = (label, min, max, val, fn, live) => { const l = document.createElement('label'); const i = document.createElement('input'); i.type = 'range'; i.min = min; i.max = max; i.step = 'any'; i.value = val; i[live ? 'oninput' : 'onchange'] = () => fn(+i.value); l.append(label, i); bar.append(l); };
+  slider('reach', 0.5, 5, set.reach, (v) => { set.reach = v; growGrass(); }); slider('height', 0.4, 2.5, set.tall, (v) => { set.tall = v; growGrass(); });
+  slider('amount', 0.2, 2, set.thick, (v) => { set.thick = v; growGrass(); }); slider('open tufts', 0, 1, set.open, (v) => { set.open = v; growGrass(); });
+  let windK = 0.4, hour = 14; slider('wind', 0, 1.6, 0.4, (v) => { windK = v; }, true); slider('hour', 5, 20, 14, (v) => { hour = v; }, true);
+  const info = document.createElement('span'); info.style.color = 'var(--dim)'; info.style.marginLeft = '8px'; bar.append(info);
+  growGrass();
+  const comp = new T.EffectComposer(rd); comp.addPass(new T.RenderPass(scene, cam)); const ao = new T.GTAOPass(scene, cam, 800, 600); ao.blendIntensity = 0.85; ao.updateGtaoMaterial({ radius: 0.3, distanceExponent: 1.2, thickness: 1, scale: 1, samples: 16 }); comp.addPass(ao); comp.addPass(new T.OutputPass());
+  const resize = () => { const w = innerWidth, h = innerHeight; rd.setSize(w, h); comp.setSize(w, h); cam.aspect = w / h; cam.updateProjectionMatrix(); }; resize(); addEventListener('resize', resize);
+  const clock = new T.Clock();
+  (function frame() {
+    const t = clock.getElapsedTime(); shared.uTime.value = t; shared.uWind.value.set(Math.sin(t * 0.2) * 0.3 * windK, 0.1 * windK, windK);
+    const a = ((hour - 6) / 12) * Math.PI, sy = Math.sin(a); su.sunPosition.value.set(Math.cos(a) * 100, sy * 100, 40); sun.position.set(Math.cos(a) * 30, Math.max(2, sy * 30), 14); sun.intensity = 0.4 + Math.max(0, sy) * 2; sun.color.set(sy < 0.35 ? '#ffc48a' : '#fff1dc');
+    const h = view.dist * Math.cos(view.pitch); cam.position.set(view.target.x + Math.sin(view.yaw) * h, view.target.y + view.dist * Math.sin(view.pitch), view.target.z + Math.cos(view.yaw) * h); cam.lookAt(view.target);
+    comp.render(); requestAnimationFrame(frame);
+  })();
+  window.LAB = { view, goTo, places, set, growGrass };
+})();
+</script>
+</body>
+</html>

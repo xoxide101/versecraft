@@ -88,6 +88,12 @@
           g.fillStyle = `hsl(${30 + r() * 14}, ${light ? 10 : 6}%, ${l}%)`; g.beginPath(); g.roundRect(x, y, w - 4, 28, 5); g.fill(); mottle(4, 0.08, true);
           const gr = gh.createRadialGradient(x + w / 2, y + 14, 2, x + w / 2, y + 14, w / 2); gr.addColorStop(0, '#e0e0e0'); gr.addColorStop(1, '#909090'); gh.fillStyle = gr; gh.beginPath(); gh.roundRect(x, y, w - 4, 28, 5); gh.fill();
         }
+      } else if (kind === 'rock') {   // granite: speckles, a few cracks, lichen patches; relief from cracks and grain
+        g.fillStyle = '#8e8a82'; g.fillRect(0, 0, S, S); gh.fillStyle = '#808080'; gh.fillRect(0, 0, S, S);
+        for (let i = 0; i < 5000; i++) { const v = r(); g.fillStyle = v < 0.5 ? `rgba(40,38,35,${r() * 0.35})` : `rgba(235,230,220,${r() * 0.3})`; const x = r() * S, y = r() * S, s = 1 + r() * 3; g.fillRect(x, y, s, s); gh.fillStyle = v < 0.5 ? '#606060' : '#a0a0a0'; gh.fillRect(x, y, s, s); }
+        mottle(60, 0.12, true);
+        for (let i = 0; i < 7; i++) { let x = r() * S, y = r() * S; g.strokeStyle = 'rgba(30,28,25,.55)'; gh.strokeStyle = '#202020'; g.lineWidth = gh.lineWidth = 1.5 + r() * 1.5; g.beginPath(); gh.beginPath(); g.moveTo(x, y); gh.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (r() - 0.5) * 60; y += (r() - 0.5) * 60; g.lineTo(x, y); gh.lineTo(x, y); } g.stroke(); gh.stroke(); }
+        for (let i = 0; i < 18; i++) { g.fillStyle = r() < 0.6 ? 'rgba(150,165,90,.35)' : 'rgba(210,200,120,.3)'; g.beginPath(); g.arc(r() * S, r() * S, 4 + r() * 14, 0, 7); g.fill(); }
       } else if (kind === 'roof') {   // overlapping tiles: white, tinted per building
         g.fillStyle = '#ffffff'; g.fillRect(0, 0, S, S); gh.fillStyle = '#000'; gh.fillRect(0, 0, S, S);
         for (let row = 0; row < 10; row++) for (let i = 0; i < 9; i++) {
