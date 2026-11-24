@@ -266,6 +266,7 @@
       { const solid = realm.things.filter((x) => x.kind !== 'forage'), near = (x, z) => solid.some((o) => o.kind === 'building' ? x > o.x - 1 && x < o.x + o.w + 1 && z > o.z && z < o.z + o.d + 1.5 : Math.abs(o.x - x) < 1.2 && Math.abs(o.z - z) < 1.2);
         g.add(RC.Mounds(THREE, realm, terrain, near)); }   // molehills, sandy heaps, lumps of earth
       // ---- the smaller things
+      const PR = RC.Props.make({ T: THREE, M, woodM, mats, GRANM, beamM, shared, tickers });   // (rc-props.js)
       let LP = null;
       const lampParts = () => LP || (LP = (() => {
         const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 2.0, 0), new THREE.Vector3(0.3, 2.22, 0), new THREE.Vector3(0.5, 2.06, 0));
@@ -337,7 +338,7 @@
               m4.compose(v.set(Math.cos(a) * r, y, Math.sin(a) * r), q, sc); dm.setMatrixAt(i, m4); }
             dm.instanceMatrix.needsUpdate = true; w1.scale.setScalar(1 + Math.sin(tm * 2.3) * 0.004); w1.position.y = 0.46 + Math.sin(tm * 1.7) * 0.004; });
           o.add(dm); return o; },
-        well: () => { const o = new THREE.Group(); o.add(cyl(0.6, 0.65, 0.7, mats.stone, 14)); o.add(box(0.08, 1.4, 0.08, mats.wood, -0.55, 0.5, 0)); o.add(box(0.08, 1.4, 0.08, mats.wood, 0.55, 0.5, 0)); const r = gable(1.4, 1.1, 0.5, M('#8b4a2b')); r.position.y = 1.9; o.add(r); return o; },
+        well: () => PR.well(),
         statue: () => {   // a grand monument: tiered marble plinth with gold inlay, a robed crowned figure with outspread gilded wings, a halo, and gems that glow softly
           const o = new THREE.Group(), marble = M('#ece8df', { roughness: 0.35, metalness: 0.02 }), dkm = M('#6b6a72', { roughness: 0.5, metalness: 0.2 }), gold = M('#d9a93a', { metalness: 0.95, roughness: 0.22 }), bronze = M('#8a5a2e', { metalness: 0.85, roughness: 0.38 });
           const gem = (c) => M(c, { roughness: 0.05, metalness: 0.1, emissive: c, emissiveIntensity: 0.55 }), ruby = gem('#d41f3a'), sapph = gem('#2a56e0'), emer = gem('#1fb36a'), amethyst = gem('#8a3fd4');
@@ -364,17 +365,17 @@
           const back = { title: 'WORK · LOST & FOUND · NEWS', lines: others.slice(0, 4).concat(['LOST: a grey cat, answers to Pip. Bring her to the Herbalist for a reward.', 'MARKET every Saturday on the plaza, from first light.']).slice(0, 6) };
           return RC.Signs.kiosk(THREE, t, back, M); },
         tablet: () => box(0.9, 1.2, 0.25, mats.stone),
-        crates: () => { const o = new THREE.Group(); o.add(box(0.6, 0.6, 0.6, M('#a2703f'))); o.add(box(0.55, 0.55, 0.55, M('#8d5f33'), 0.6, 0, 0.1)); o.add(box(0.5, 0.5, 0.5, M('#a2703f'), 0.25, 0.6, 0)); return o; },
-        dock_cargo: () => { const o = new THREE.Group(); for (let i = 0; i < 3; i++) o.add(cyl(0.3, 0.3, 0.7, M('#7a4a22'), 10, i * 0.65 - 0.65)); o.add(box(0.6, 0.6, 0.6, M('#a2703f'), 0, 0, 0.7)); return o; },
-        anvil: () => { const o = new THREE.Group(); o.add(box(0.35, 0.5, 0.35, mats.darkWood)); o.add(box(0.7, 0.25, 0.3, mats.iron, 0, 0.5, 0)); return o; },
+        crates: () => { const o = new THREE.Group(), a = PR.crate(0.62), b2 = PR.crate(0.52), c = PR.crate(0.46), s1 = PR.sack(), s2 = PR.sack(0.85); b2.position.set(0.62, 0, 0.12); b2.rotation.y = 0.3; c.position.set(0.25, 0.62, 0.02); c.rotation.y = -0.2; s1.position.set(-0.55, 0, 0.25); s2.position.set(-0.45, 0, -0.35); s2.rotation.z = 0.3; o.add(a, b2, c, s1, s2); return o; },
+        dock_cargo: () => { const o = new THREE.Group(); [[-0.65, 0], [0, 0.05], [0.65, -0.05]].forEach(([x, z], i) => { const b2 = PR.barrel(0.85, 0.29); b2.position.set(x, 0, z); b2.rotation.y = i; o.add(b2); }); const c = PR.crate(0.6); c.position.set(0, 0, 0.75); o.add(c); const s = PR.sack(); s.position.set(0.7, 0, 0.7); o.add(s); return o; },
+        anvil: () => PR.anvil(),
         telescope: () => { const o = new THREE.Group(); o.add(cyl(0.03, 0.03, 1.1, mats.iron, 6)); const t = cyl(0.08, 0.11, 0.9, mats.brass, 10); t.rotation.z = 1.1; t.position.set(0.2, 1.2, 0); o.add(t); return o; },
         bell: () => { const o = new THREE.Group(); o.add(box(0.1, 2, 0.1, mats.wood, -0.5)); o.add(box(0.1, 2, 0.1, mats.wood, 0.5)); o.add(box(1.2, 0.12, 0.14, mats.wood, 0, 2, 0)); const b = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.45, 12, 1, true), mats.brass); b.position.y = 1.7; o.add(b); return o; },
-        campfire: () => { const o = new THREE.Group(); for (let i = 0; i < 4; i++) { const l = cyl(0.06, 0.06, 0.7, mats.darkWood, 6); l.rotation.z = 1.4; l.rotation.y = i * 0.8; l.position.y = 0.1; o.add(l); } const fl = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.5, 6), mats.glow); fl.position.y = 0.3; o.add(fl); return o; },
+        campfire: () => PR.campfire(),
         bookshelf: () => box(1.2, 1.8, 0.4, M('#6b4226')),
         shrub: (t) => { const kind = { berry: 'berry', fern: 'fern', blossom: 'blossom', frost_bush: 'frost_bush', ember_fern: 'ember_fern' }[t.variant] || 'bush', fb = RC.Flora.bush(THREE, kind, Math.floor(t.x * 7 + t.z), 1);
           const tint0 = new THREE.Color(fb.color), lm = floraMats.leafMat(fb.leaf, 0.06), o = new THREE.Group(), m = new THREE.Mesh(fb.leaves, lm); m.customDepthMaterial = lm.userData.depth; o.add(m); if (fb.bark) { const bk = new THREE.Mesh(fb.bark, floraMats.barkMat('oak')); bk.castShadow = true; o.add(bk); } if (fb.fill) { const fm = new THREE.Mesh(fb.fill, floraMats.fillMat(fb.leaf)); fm.castShadow = true; o.add(fm); const fc = fb.fill.attributes.color; for (let i = 0; i < fc.count; i++) fc.setXYZ(i, fc.getX(i) * tint0.r, fc.getY(i) * tint0.g, fc.getZ(i) * tint0.b); }
           const tint = new THREE.Color(fb.color), c = fb.leaves.attributes.color; for (let i = 0; i < c.count; i++) c.setXYZ(i, c.getX(i) * tint.r, c.getY(i) * tint.g, c.getZ(i) * tint.b); o.scale.setScalar(1.15); return o; },
-        chest: () => { const o = new THREE.Group(); o.add(box(0.7, 0.4, 0.45, M('#8b5a2b'))); const lid = box(0.72, 0.16, 0.47, M('#6b4226'), 0, 0.4, 0); lid.name = 'lid'; o.add(lid); o.add(box(0.12, 0.14, 0.05, mats.brass, 0, 0.32, 0.24)); return o; },
+        chest: () => PR.chest(),
         forage: (t) => { if (t.node === 'mushroom') { const o = RC.Mushrooms.cluster(THREE, t.mush, Math.floor(t.x * 13 + t.z * 7), mushMats); if (t.onTrunk) o.rotation.y = Math.atan2(Math.cos(t.face), Math.sin(t.face)); if (o.userData.glowMat) glowMats.add(o.userData.glowMat); return o; }
           const o = new THREE.Group(); const n = t.node;
           if (/vein/.test(n)) {   // a rock to break with a pick: lumpy grey stone with metal showing through in seams, flecks and crystals; each metal its own colour
@@ -409,7 +410,9 @@
           return o; },
         station: (t) => { const o = new THREE.Group();
           if (t.station === 'forge') { o.add(box(1.4, 0.9, 1, mats.darkStone)); o.add(box(0.9, 0.12, 0.6, mats.glow, 0, 0.9, 0)); o.add(box(0.5, 1.4, 0.5, mats.darkStone, 0, 0.9, -0.3)); }
-          else if (t.station === 'alchemy') { o.add(cyl(0.55, 0.42, 0.7, mats.iron, 14)); o.add(cyl(0.48, 0.48, 0.05, new THREE.MeshStandardMaterial({ color: '#f97316', emissive: '#ea580c', emissiveIntensity: 0.8 }), 14, 0, 0.66)); }
+          else if (t.station === 'alchemy') { o.add(PR.cauldron()); return o; }
+          else if (t.station === 'alchemy_old') { o.add(cyl(0.55, 0.42, 0.7, mats.iron, 14)); o.add(cyl(0.48, 0.48, 0.05, new THREE.MeshStandardMaterial({ color: '#f97316', emissive: '#ea580c', emissiveIntensity: 0.8 }), 14, 0, 0.66)); }
+          else if (t.station === 'cooking' || !t.station) { o.add(PR.kettle()); return o; }
           else { for (let i = 0; i < 3; i++) { const l = cyl(0.03, 0.03, 1.5, mats.iron, 5); l.position.set(Math.cos(i * 2.1) * 0.45, 0.65, Math.sin(i * 2.1) * 0.45); l.rotation.set(Math.sin(i * 2.1) * 0.3, 0, -Math.cos(i * 2.1) * 0.3); o.add(l); } const k = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 8, 0, 6.3, 0, 2.2), mats.iron); k.position.y = 0.6; o.add(k); o.add(new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.35, 6), mats.glow)); }
           return o; },
         boat: (t) => { const o = new THREE.Group(); const hm = M(t.hull || '#7c4a1e'); o.add(box(2.2, 0.45, 0.95, hm, -0.2, 0.05, 0)); const bow = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.45, 3, 1), hm); bow.rotation.y = Math.PI / 6; bow.scale.set(1.3, 1, 1); bow.position.set(1.0, 0.28, 0); o.add(bow); o.add(box(2.0, 0.06, 0.8, M('#a0703f'), -0.2, 0.42, 0)); o.add(cyl(0.05, 0.05, 2.6, mats.darkWood, 6, 0, 0.3)); const sail = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.7), M(t.sail || '#f5f0e1', { side: THREE.DoubleSide })); sail.position.set(0.05, 1.7, 0); sail.rotation.y = Math.PI / 2; o.add(sail); if (t.facing === 'left') o.rotation.y = Math.PI; return o; },

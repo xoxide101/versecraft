@@ -103,7 +103,7 @@
         else this.say('Just leaves and a startled beetle.');
         return;
       }
-      if (u.kind === 'chest') { t.done = true; if (t._obj) { const lid = t._obj.getObjectByName('lid'); if (lid) { lid.rotation.x = -1.2; lid.position.z -= 0.15; lid.position.y += 0.15; } } if (/gold/i.test(t.reward)) pl.gold += t.amount || 50; else pl.bag[t.reward] = (pl.bag[t.reward] || 0) + 1; this.say(`The chest holds: ${t.reward}${t.amount ? ' ×' + t.amount : ''}.`); return; }
+      if (u.kind === 'chest') { t.done = true; if (t._obj) { const lid = t._obj.getObjectByName('lid'); if (lid && lid.userData.hinge) lid.rotation.x = -1.9; else if (lid) { lid.rotation.x = -1.2; lid.position.z -= 0.15; lid.position.y += 0.15; } } if (/gold/i.test(t.reward)) pl.gold += t.amount || 50; else pl.bag[t.reward] = (pl.bag[t.reward] || 0) + 1; this.say(`The chest holds: ${t.reward}${t.amount ? ' ×' + t.amount : ''}.`); return; }
       if (u.kind === 'forage') { t.done = true; if (t._obj) { if (t.node === 'mushroom') t._obj.visible = false; else t._obj.scale.setScalar(0.5); } pl.bag[t.name] = (pl.bag[t.name] || 0) + (t.amount || 1); this.say(`Gathered ${t.name} ×${t.amount || 1}${t.use ? ' (' + t.use + ')' : ''}.`); return; }
       if (u.kind === 'station') { this.dialogue = { who: { x: t.x, z: t.z }, name: t.title, lines: [t.subtitle, 'Crafting here comes in a later step: what you gather goes in your bag for now.'], i: 0 }; return; }
       if (u.kind === 'bell') { this.shake = 0.3; this.say('DONG… the bell rings out over the harbor.'); return; }
