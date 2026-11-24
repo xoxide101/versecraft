@@ -19,6 +19,8 @@
       this.weather = 'breezy'; this.weatherT = 90; this.wind = { dir: 0.8, target: 0.8, speed: 13, t: 30 }; this.flash = 0; this.flashT = 5; this.shake = 0;
       this.yaw = 0; this.yawTarget = 0; this.viewMode = 'evo'; this.zoom = 1;
       this.dialogue = null; this.target = null; this.toast = null; this.lying = { wet: 0, snow: 0 };   // rain and snow lying about
+      // weather never just switches: clouds gather first, rain builds from a drizzle, comes and goes in waves (heavier, lighter), then eases off
+      this.cloud = 0; this.precipBase = 0; this.precip = 0; this.snowfall = 0; this.wxClock = Math.random() * 500;
     }
     get player() { return this.players[0]; }
     say(text, secs = 3) { this.toast = { text, t: secs }; }
@@ -38,7 +40,7 @@
       // ---- time and weather keys: T moves time on 3 hours, G changes the sky
       if (I.hit('t')) { this.calendar.add(3); const n = this.calendar.now(); this.say(`${n.weekdayName} · ${this.calendar.clock()} (${n.period})`, 2); }
       if (I.hit('g')) { this.setWeather(WEATHER[(WEATHER.indexOf(this.weather) + 1) % WEATHER.length]); }
-      this.calendar.step(dt); this.stepWeather(dt); RC.weatherStep(this.lying, this.weather, dt);
+      this.calendar.step(dt); this.stepWeather(dt); RC.weatherStep(this.lying, this, dt);
       if (this.toast && (this.toast.t -= dt) <= 0) this.toast = null;
       this.shake = Math.max(0, this.shake - dt * 2);
       // ---- talking: Space moves on, Esc stops
@@ -110,13 +112,27 @@
     endTalk() { this.dialogue = null; }
 
     setWeather(w) { this.weather = w; this.weatherT = 70 + Math.random() * 55; if (w === 'storm') { this.flash = 0.85; this.flashT = 4.5; } this.say('Weather · ' + w.toUpperCase(), 1.6); }
+    // the weather in words, with how hard it is coming down (for the clock box)
+    weatherWord() { const p = this.precip, s = this.snowfall;
+      if (p > 0.03) return (p < 0.15 ? 'drizzle' : p < 0.35 ? 'light rain' : p < 0.6 ? 'rain' : p < 0.82 ? 'heavy rain' : 'downpour') + (this.weather === 'storm' ? ' · storm' : '');
+      if (s > 0.03) return s < 0.35 ? 'light snow' : s < 0.7 ? 'snow' : 'heavy snow';
+      return this.cloud > 0.35 ? (this.weather === 'clear' || this.weather === 'breezy' ? 'clearing' : 'clouding over') : this.weather; }
     stepWeather(dt) {
-      if ((this.weatherT -= dt) <= 0) { const r = Math.random(); this.setWeather(r < 0.42 ? 'clear' : r < 0.66 ? 'breezy' : r < 0.86 ? 'rain' : r < 0.96 ? 'storm' : 'snow'); this.wind.target += (Math.random() - 0.5) * 1.6; }
+      if ((this.weatherT -= dt) <= 0) {   // the next weather grows out of this one (clear → breezy → rain → storm and back down), not a jump
+        const NEXT = { clear: [['clear', 2], ['breezy', 3]], breezy: [['clear', 3], ['breezy', 1], ['rain', 2.2], ['snow', 0.4]], rain: [['rain', 1.4], ['breezy', 2], ['storm', 1]], storm: [['rain', 1]], snow: [['snow', 1], ['breezy', 1.5]] }[this.weather];
+        let r = Math.random() * NEXT.reduce((s, x) => s + x[1], 0), w = NEXT[0][0]; for (const [k, p] of NEXT) { if ((r -= p) <= 0) { w = k; break; } }
+        if (w === this.weather) this.weatherT = 60 + Math.random() * 60; else this.setWeather(w); this.wind.target += (Math.random() - 0.5) * 1.6; }
+      // amounts: clouds come quickest, rain or snow follows them in and out (half a minute or so), and rides on slow waves and quicker bursts
+      const c = (this.wxClock += dt), wv = this.weather, wave = RC.clamp(0.5 + Math.sin(c / 41) * 0.28 + Math.sin(c / 13.7 + 1.3) * 0.16 + Math.sin(c / 5.3 + 4.1) * 0.09 + Math.sin(c / 2.1) * 0.04, 0, 1);
+      this.cloud = RC.damp(this.cloud, { clear: 0, breezy: 0.12, rain: 0.5, storm: 0.72, snow: 0.42 }[wv] || 0, 0.12, dt);
+      this.precipBase = RC.damp(this.precipBase, { rain: 0.6, storm: 1 }[wv] || 0, 0.045, dt);
+      this.precip = this.precipBase * (0.3 + wave * 0.85); this.snowfall = RC.damp(this.snowfall, wv === 'snow' ? 0.4 + wave * 0.6 : 0, 0.05, dt);
+      this.gust = 0.75 + wave * 0.5;
       if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 3.4);
-      if (this.weather === 'storm' && (this.flashT -= dt) <= 0) { this.flash = 0.92; this.flashT = 5.5 + Math.random() * 7.5; this.shake = 0.14; }
+      if (this.weather === 'storm' && this.precip > 0.55 && (this.flashT -= dt) <= 0) { this.flash = 0.92; this.flashT = 5.5 + Math.random() * 7.5; this.shake = 0.14; }
       const w = this.wind; if ((w.t -= dt) <= 0) { w.t = 28 + Math.random() * 24; w.target += (Math.random() < 0.5 ? -1 : 1) * (0.45 + Math.random() * 0.6); }
       w.dir = RC.dampAngle(w.dir, w.target, 0.6, dt);
-      const want = { clear: 6, breezy: 14, rain: 12, storm: 26, snow: 9 }[this.weather]; w.speed = RC.damp(w.speed, want, 0.3, dt);
+      const want = { clear: 6, breezy: 14, rain: 12, storm: 26, snow: 9 }[this.weather]; w.speed = RC.damp(w.speed, want * (this.gust || 1), 0.3, dt);
     }
   };
 })();

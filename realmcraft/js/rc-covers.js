@@ -14,15 +14,15 @@
   // counts are for a 4 × 4 patch
   RC.Covers.RECIPES = {
     // ---- grasslands
-    meadow: { name: 'Meadow', ground: '#4a4030', layout: 'even', count: 1800, h: [0.18, 0.34], w: 0.008, lean: 0.25, droop: 0.12, root: '#2f4a1f', tip: '#7cc24a', tipMix: '#a8d86a' },
+    meadow: { name: 'Meadow', ground: '#4a4030', layout: 'even', count: 1800, h: [0.18, 0.34], w: 0.012, lean: 0.25, droop: 0.12, root: '#2f4a1f', tip: '#7cc24a', tipMix: '#a8d86a' },
     tall_prairie: { name: 'Tall prairie', ground: '#4a4030', layout: 'even', count: 1500, h: [0.45, 0.8], w: 0.007, lean: 0.25, droop: 0.2, root: '#5a5a30', tip: '#c9b878', tipMix: '#8a9a50' },
     wheat: { name: 'Wheat', ground: '#5a4428', layout: 'even', count: 2200, h: [0.55, 0.7], w: 0.006, lean: 0.06, droop: 0.04, stiff: true, root: '#b8892a', tip: '#e7b84a', heads: { kind: 'ear', chance: 0.7, color: '#e2b04a' } },
     dry_savanna: { name: 'Dry savanna', ground: '#c08a5a', layout: 'even', count: 520, h: [0.3, 0.6], w: 0.005, lean: 0.25, droop: 0.15, root: '#4a3a22', tip: '#d8c08a' },
-    lawn: { name: 'Lawn', ground: '#2e4a22', layout: 'even', count: 5200, h: [0.05, 0.09], w: 0.006, lean: 0.15, droop: 0.02, root: '#2a4a1e', tip: '#4f8a34' },
+    lawn: { name: 'Lawn', ground: '#2e4a22', layout: 'even', count: 5200, h: [0.05, 0.09], w: 0.009, lean: 0.15, droop: 0.02, root: '#2a4a1e', tip: '#4f8a34' },
     stylized: { name: 'Stylized', ground: '#3f7a35', layout: 'even', count: 1100, h: [0.18, 0.32], w: 0.03, lean: 0.12, droop: 0.04, root: '#2f6a28', tip: '#7fdc55' },
     summer_tall: { name: 'Summer tall', ground: '#3a3426', layout: 'even', count: 1700, h: [0.45, 0.75], w: 0.012, lean: 0.2, droop: 0.15, root: '#2a5a1e', tip: '#6cc23e' },
     autumn_tall: { name: 'Autumn tall', ground: '#3a2e22', layout: 'even', count: 1700, h: [0.45, 0.75], w: 0.011, lean: 0.3, droop: 0.3, root: '#5a3a1a', tip: '#b07038' },
-    summer_wild: { name: 'Summer wild', ground: '#4a3e2c', layout: 'even', count: 1100, patchy: 0.35, h: [0.25, 0.6], w: 0.01, lean: 0.3, droop: 0.2, root: '#2a5a1e', tip: '#76c84a', flowers: { chance: 0.05, colors: ['#ffffff', '#f5d02a'], h: [0.25, 0.45] } },
+    summer_wild: { name: 'Summer wild', ground: '#4a3e2c', layout: 'even', count: 1100, patchy: 0.35, h: [0.25, 0.6], w: 0.014, lean: 0.3, droop: 0.2, root: '#2a5a1e', tip: '#76c84a', flowers: { chance: 0.05, colors: ['#ffffff', '#f5d02a'], h: [0.25, 0.45] } },
     autumn_wild: { name: 'Autumn wild', ground: '#3e3024', layout: 'even', count: 1300, patchy: 0.25, h: [0.3, 0.6], w: 0.009, lean: 0.4, droop: 0.35, root: '#4a3218', tip: '#a8743a' },
     wildflower_meadow: { name: 'Wildflower meadow', ground: '#4a3e2c', layout: 'even', count: 1000, h: [0.2, 0.42], w: 0.009, lean: 0.2, droop: 0.12, root: '#2f5a22', tip: '#7cc24a', flowers: { chance: 0.22, colors: ['#ffffff', '#f5c518', '#f0a81a', '#fbfbf0'], h: [0.2, 0.4] } },
     seed_heads: { name: 'Seed heads', ground: '#3e3a2a', layout: 'even', count: 1700, h: [0.45, 0.65], w: 0.006, lean: 0.12, droop: 0.06, root: '#4a6a2a', tip: '#c9c08a', heads: { kind: 'seed', chance: 0.75, color: '#e2d6a0' } },

@@ -31,7 +31,14 @@
         else if (s.op === 'roll') y += Math.max(0, Math.sin(x * s.fx) * Math.cos(z * s.fz)) * s.amp;
       }
       if (this.cell(x, z) === '-') y += 0.04;   // roads sit a touch proud
-      return y;
+      const r = this.rough(x, z); return r >= 0 || this.waterY == null ? y + r : Math.max(y + r, Math.min(y, this.waterY + 0.05));   // (hollows never dip below the sea's level: the water would show through)
+    }
+    // small rises and hollows everywhere (nothing is laid perfectly level): a few cm on roads, more on grass, most in the woods
+    rough(x, z) {
+      const AMP = { '-': 0.035, '.': 0.07, ',': 0.11, 'T': 0.16, '=': 0, '~': 0.05 }, X = RC.clamp(x - 0.5, 0, this.w - 1.001), Z = RC.clamp(z - 0.5, 0, this.h - 1.001), c = Math.floor(X), r = Math.floor(Z), fx = RC.smooth01(X - c), fz = RC.smooth01(Z - r);
+      const a = (cc, rr) => { const k = this.paint[Math.min(this.h - 1, rr)][Math.min(this.w - 1, cc)]; return AMP[k] != null ? AMP[k] : 0.07; };
+      const amp = RC.lerp(RC.lerp(a(c, r), a(c + 1, r), fx), RC.lerp(a(c, r + 1), a(c + 1, r + 1), fx), fz);
+      return ((RC.fbm(x, z, 2.4, 3, 401) - 0.5) * 2 + (RC.vnoise(x, z, 7, 402) - 0.5) * 1.2) * amp;
     }
     // the ground surface for the mesh: the sea bed under water, a bank where land meets water
     surface(x, z) {
@@ -50,7 +57,7 @@
 
     // ---------------------------------------------------------------- drawing: one mesh with a painted ground picture, and the water
     build(THREE) {
-      const g = new THREE.Group(), W = this.w, H = this.h, R = 2;   // two mesh squares per cell
+      const g = new THREE.Group(), W = this.w, H = this.h, R = 3;   // three mesh squares per cell (fine enough for the bumps)
       const geo = new THREE.PlaneGeometry(W, H, W * R, H * R); geo.rotateX(-Math.PI / 2); geo.translate(W / 2, 0, H / 2);
       const p = geo.attributes.position;
       for (let i = 0; i < p.count; i++) p.setY(i, this.surface(p.getX(i), p.getZ(i)));
@@ -111,6 +118,10 @@
               float edge = 1.0 - smoothstep(0.5, 0.95, sp.r), wild = gN(vWp.xz * 0.9 + 3.0);
               float grassIn = clamp((edge * 0.95 + wild * 0.4 - 0.32) * 1.7, 0.0, 1.0) * (1.0 - smoothstep(0.22, 0.42, stoneH));
               cob = mix(cob, grassC * 0.85, grassIn);
+              float miss = smoothstep(0.66, 0.8, gN(vWp.xz * 0.7 + 21.0) * 0.55 + gN(vWp.xz * 1.9 + 3.0) * 0.3 + gN(vWp.xz * 4.7) * 0.15) * smoothstep(0.35, 0.6, gN(vWp.xz * 0.21 + 4.0));
+              cob = mix(cob, texture2D(tC1, luv(uScale.y)).rgb * 0.95, miss * (1.0 - smoothstep(0.25, 0.45, stoneH) * 0.7) * 0.85);   // (earth where stones are gone or sunk, the proud ones still showing)
+              cob = mix(cob, texture2D(tC3, luv(uScale.w)).rgb * 0.85, (1.0 - smoothstep(0.16, 0.3, stoneH)) * 0.45 * gN(vWp.xz * 0.6 + 12.0));
+              cob *= 1.0 - smoothstep(0.55, 0.8, gN(vWp.xz * 0.12 + 40.0)) * 0.18;   // (old stains, damp patches)
               // stones stand proud of the dirt and grass at the edges (height-based blending)
               sp.r = clamp(sp.r * (0.7 + stoneH * 0.9), 0.0, 1.0);
               float wg = clamp(1.0 - sp.r - sp.g - sp.b - sp.a, 0.0, 1.0);
@@ -136,7 +147,8 @@
         const cob = road2 * RC.smooth01((town - 0.35 + (RC.fbm(wx, wz, 2, 3, 34) - 0.5) * 0.5) / 0.25), track = road2 - cob;   // (cobbles in town, a dirt track beyond)
         const kept = this.kept ? this.kept(wx, wz) : 0, worn = this.worn ? this.worn(wx, wz) : 0;
         let dirt = Math.max(track * 0.95, RC.smooth01((RC.fbm(wx + 31, wz + 17, 3.2, 5, 5) - 0.6 + worn * 0.35 - kept * 0.12) / 0.08) * (1 - cob));
-        const forest = RC.smooth01((under - 0.3) / 0.4) * (1 - cob) * 0.85, sand = RC.smooth01((water - 0.2) / 0.35) * (1 - cob);
+        const wildG = this.cell(wx, wz) === ',' || this.cell(wx, wz) === '.' ? 1 - kept : 0, bare = RC.smooth01((RC.fbm(wx + 70, wz + 20, 3.5, 4, 55) - 0.66) / 0.07) * wildG * 0.75;
+        const forest = RC.smooth01((under - 0.3) / 0.4) * (1 - cob) * 0.85, sand = Math.max(RC.smooth01((water - 0.2) / 0.35), bare) * (1 - cob);
         dirt *= 1 - forest; const sum = cob + dirt + forest + sand, k = sum > 1 ? 1 / sum : 1;
         d[i] = cob * k * 255; d[i + 1] = dirt * k * 255; d[i + 2] = forest * k * 255; d[i + 3] = sand * k * 255;
       }

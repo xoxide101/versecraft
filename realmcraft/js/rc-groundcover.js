@@ -50,10 +50,11 @@
       const vn = RC.Covers.vnoise, grass = (k) => k === '.' || k === ',';   // (kept / natural: this.kept)
       const free = (x, z) => !this.solid[Math.floor(z) * this.W + Math.floor(x)] && this.terrain.soft('-', x, z) < 0.42 + (RC.fbm(x, z, 0.9, 4, 33) - 0.5) * 0.75;   // grass creeps onto the road edges along the same ragged line
       const gaps = (x, z) => RC.smooth01((vn(x + 40, z + 40, 2.6, 11) - 0.22) / 0.25);   // bare earth here and there
+      const tuft = (x, z) => 0.3 + 0.7 * RC.smooth01((vn(x + 11, z + 7, 0.5, 93) * 0.7 + vn(x, z, 0.21, 94) * 0.3 - 0.3) / 0.4);   // grass grows in clumps and tussocks, not an even fur
       return {
-        meadow: (x, z) => { const k = this.at(x, z); return grass(k) && free(x, z) ? (0.8 - this.terrain.soft(',', x, z) * 0.35) * gaps(x, z) * (1 - this.kept(x, z) * 0.8) : 0; },
-        lawn: (x, z) => { const k = this.at(x, z); return k === '.' && free(x, z) ? 0.15 + this.kept(x, z) * 0.85 : 0; },
-        summer_wild: (x, z) => { const k = this.at(x, z); return grass(k) && free(x, z) ? RC.smooth01((RC.fbm(x, z, 5, 3, 71) - 0.55) / 0.12) * (1 - this.kept(x, z)) : 0; },
+        meadow: (x, z) => { const k = this.at(x, z); return grass(k) && free(x, z) ? (0.8 - this.terrain.soft(',', x, z) * 0.35) * gaps(x, z) * tuft(x, z) * (1 - this.kept(x, z) * 0.8) : 0; },
+        lawn: (x, z) => { const k = this.at(x, z); return k === '.' && free(x, z) ? (0.15 + this.kept(x, z) * 0.85) * (0.55 + 0.45 * tuft(x + 3, z)) : 0; },
+        summer_wild: (x, z) => { const k = this.at(x, z); return grass(k) && free(x, z) ? RC.smooth01((RC.fbm(x, z, 5, 3, 71) - 0.55) / 0.12) * tuft(x - 5, z) * (1 - this.kept(x, z)) : 0; },
         wildflower_meadow: (x, z) => { const k = this.at(x, z); if (!grass(k) || !free(x, z)) return 0; return Math.max(this.terrain.soft(',', x, z) * 0.8, RC.smooth01((vn(x, z, 3.5, 21) - 0.68) / 0.12) * 0.8); },
         summer_tall: (x, z) => { const k = this.at(x, z); if (!grass(k) || !free(x, z)) return 0; const d = this.field(this.dThing, x, z), untended = RC.smooth01((RC.vnoise(x, z, 3, 81) - 0.35) / 0.3) * (1 - this.kept(x, z) * 0.85); return (1 - RC.smooth01((d - 0.3) / 1.6)) * 0.95 * untended; },
         tiny_spinifex: (x, z) => { const k = this.at(x, z); if (!grass(k) || !free(x, z)) return 0; const d = this.field(this.dThing, x, z); return 1 - RC.smooth01((d - 0.2) / 0.9); },

@@ -13,7 +13,8 @@
     float wxHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float wxNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
       return mix(mix(wxHash(i), wxHash(i + vec2(1, 0)), f.x), mix(wxHash(i + vec2(0, 1)), wxHash(i + vec2(1, 1)), f.x), f.y); }
-    float wxFbm(vec2 p) { return wxNoise(p) * 0.55 + wxNoise(p * 2.3) * 0.3 + wxNoise(p * 5.1) * 0.15; }\n`;
+    float wxFbm(vec2 p) { return wxNoise(p) * 0.55 + wxNoise(p * 2.3) * 0.3 + wxNoise(p * 5.1) * 0.15; }
+    float wxPuddle = 0.0;\n`;
   const FRAG_BODY = (puddles) => `
     {
       vec3 upV = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
@@ -26,7 +27,7 @@
       float pd = wxFbm(vWxW.xz * 0.45 + 17.0);
       float puddle = smoothstep(1.0 - uWet * 0.42, 1.0 - uWet * 0.42 + 0.05, pd) * step(0.7, facing);
       diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.35 + vec3(0.03, 0.04, 0.05), puddle);
-      roughnessFactor = mix(roughnessFactor, 0.03, puddle); normal = normalize(mix(normal, upV, puddle * 0.9));` : ''}
+      roughnessFactor = mix(roughnessFactor, 0.1, puddle); wxPuddle = puddle; normal = normalize(mix(normal, upV, puddle * 0.9));` : ''}
       // snow: settles in patches first (the noise), then everywhere that faces up
       float sn = wxFbm(vWxW.xz * 0.7) * 0.55 + max(facing, 0.0) * 0.45;
       float snow = smoothstep(1.02 - uSnow * 1.1, 1.1 - uSnow * 1.1, sn) * smoothstep(0.15, 0.45, facing);
@@ -44,7 +45,8 @@
           if (before) before.call(m, sh, r);
           sh.uniforms.uWet = shared.uWet; sh.uniforms.uSnow = shared.uSnow;
           sh.vertexShader = 'varying vec3 vWxW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>' + VERT);
-          sh.fragmentShader = FRAG_HEAD + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>' + FRAG_BODY(puddles));
+          sh.fragmentShader = FRAG_HEAD + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>' + FRAG_BODY(puddles))
+            .replace('#include <opaque_fragment>', puddles ? '  outgoingLight = mix(outgoingLight, vec3(dot(outgoingLight, vec3(0.3, 0.5, 0.2))) * vec3(0.92, 0.96, 1.0), wxPuddle * 0.85);\n#include <opaque_fragment>' : '#include <opaque_fragment>');   // (puddles mirror a grey sky, not a blue one)
         };
         m.customProgramCacheKey = () => (key ? key() : m.type) + '|wx' + (puddles ? 'p' : '');
         m.needsUpdate = true;
@@ -52,9 +54,9 @@
     });
   };
   // how much is lying about: builds while it rains or snows, fades after (melting faster than it settles)
-  RC.weatherStep = (state, weather, dt) => {
-    const raining = weather === 'rain' || weather === 'storm', snowing = weather === 'snow';
-    state.wet = RC.clamp(state.wet + dt * (raining ? (weather === 'storm' ? 1 / 25 : 1 / 45) : snowing ? -1 / 400 : -1 / 160), 0, 1);
-    state.snow = RC.clamp(state.snow + dt * (snowing ? 1 / 90 : -1 / (raining ? 60 : 220)), 0, 1);
+  RC.weatherStep = (state, sim, dt) => {   // (by how hard it is coming down right now: a drizzle barely wets, a downpour soaks)
+    const p = sim.precip || 0, s = sim.snowfall || 0;
+    state.wet = RC.clamp(state.wet + dt * (p > 0.03 ? p / 26 : s > 0.03 ? -1 / 400 : -1 / 160), 0, 1);
+    state.snow = RC.clamp(state.snow + dt * (s > 0.03 ? s / 70 : -1 / (p > 0.03 ? 60 : 220)), 0, 1);
   };
 })();

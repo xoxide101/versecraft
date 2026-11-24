@@ -40,7 +40,7 @@
       // view and clock panels
       const deg = Math.round(((((-s.yaw) * 180) / Math.PI) % 360 + 360) % 360) % 360;
       this.viewP.innerHTML = `<b>LOOK ${dirOf(deg)} · ${RC.VIEWS[s.viewMode].label}${s.zoom !== 1 ? ' ' + Math.round(s.zoom * 100) + '%' : ''}</b><small>[Q/E] ↺90° · drag turn/tilt · [V] VIEW · [R] RESET</small>`;
-      this.clockP.innerHTML = `<b>${now.weekdayName.slice(0, 3).toUpperCase()} · DAY ${now.dayNumber}<span>${s.calendar.clock()}</span></b><small>${now.season.toUpperCase()} · ${now.day} ${now.monthName} · YR ${now.year}${now.market ? ' · MARKET' : ''}</small><small>${s.weather.toUpperCase()} · [T]+3H · [G] SKY</small>`;
+      this.clockP.innerHTML = `<b>${now.weekdayName.slice(0, 3).toUpperCase()} · DAY ${now.dayNumber}<span>${s.calendar.clock()}</span></b><small>${now.season.toUpperCase()} · ${now.day} ${now.monthName} · YR ${now.year}${now.market ? ' · MARKET' : ''}</small><small>${(s.weatherWord ? s.weatherWord() : s.weather).toUpperCase()} · [T]+3H · [G] SKY</small>`;
       // compass: gold = where you look, blue = the wind
       const c = this.compass.getContext('2d'), R = 70; c.clearRect(0, 0, 180, 180); c.save(); c.translate(90, 90);
       c.strokeStyle = 'rgba(148,197,255,.6)'; c.lineWidth = 3; c.beginPath(); c.arc(0, 0, R, 0, 7); c.stroke();

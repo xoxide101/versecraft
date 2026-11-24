@@ -83,11 +83,11 @@
     draw(dt, t) {
       const T = this.T, sim = this.sim, now = sim.calendar.now(), pl = sim.players[0];
       this.shared.uTime.value = t;
-      const wind = sim.wind; this.shared.uWind.value.set(Math.cos(wind.dir) * wind.speed * 0.04, Math.sin(wind.dir) * wind.speed * 0.04, { storm: 1.4, breezy: 0.9, rain: 0.7, snow: 0.5, clear: 0.3 }[sim.weather] || 0.3);
+      const wind = sim.wind; this.shared.uWind.value.set(Math.cos(wind.dir) * wind.speed * 0.04, Math.sin(wind.dir) * wind.speed * 0.04, ({ storm: 1.4, breezy: 0.9, rain: 0.7, snow: 0.5, clear: 0.3 }[sim.weather] || 0.3) * (sim.gust || 1));
       // ---- sky and sun through the day (and the weather's greys)
       const f = now.dayFraction; let i = 0; while (i < SKY.length - 2 && f > SKY[i + 1][0]) i++;
       const a = SKY[i], b = SKY[i + 1], k = (f - a[0]) / (b[0] - a[0]);
-      const sky = new T.Color(a[1]).lerp(new T.Color(b[1]), k), grey = { rain: 0.45, storm: 0.65, snow: 0.3, breezy: 0.05, clear: 0 }[sim.weather] || 0;
+      const sky = new T.Color(a[1]).lerp(new T.Color(b[1]), k), grey = sim.cloud != null ? sim.cloud + (sim.precip || 0) * 0.15 : { rain: 0.45, storm: 0.65, snow: 0.3, breezy: 0.05, clear: 0 }[sim.weather] || 0;   // (darker as it comes down harder)
       sky.lerp(new T.Color('#7b8794'), grey);
       let sunI = RC.lerp(a[2], b[2], k) * (1 - grey * 0.6), amb = RC.lerp(a[3], b[3], k);
       if (sim.flash > 0) { sky.lerp(new T.Color('#ffffff'), sim.flash * 0.7); amb += sim.flash * 2; }
@@ -102,7 +102,7 @@
       // which real sky lights the scene: weather first, then the time of day
       const mood = grey > 0.25 ? 'overcast' : this.night > 0.75 ? 'night' : f < 0.3 ? 'sunset' : f > 0.8 ? 'dusk' : f > 0.73 ? 'sunset' : 'day';
       if (mood !== this.envMood && this.envs[mood]) { this.envMood = mood; this.scene.environment = this.envs[mood]; }
-      const hasEnv = !!this.scene.environment; this.scene.environmentIntensity = hasEnv ? RC.lerp(0.12, 0.5, RC.clamp(sunI / 1.8, 0, 1)) * (1 - grey * 0.25) : 0;   // (the sky's light follows the sun's strength: warm and low at sunset, faint at night)
+      const hasEnv = !!this.scene.environment; this.scene.environmentIntensity = hasEnv ? RC.lerp(0.12, 0.5, RC.clamp(sunI / 1.8, 0, 1)) * (1 - grey * 0.55) : 0;   // (the sky's light follows the sun's strength: warm and low at sunset, faint at night)
       this.sun.intensity = sunI; this.hemi.intensity = hasEnv ? amb * 0.35 : amb; this.sun.color.set(f < 0.3 || f > 0.75 ? '#ffc58a' : '#fff4e0');
       // ---- camera
       const v = VIEWS[sim.viewMode] || VIEWS.evo, talk = sim.dialogue && sim.dialogue.who;
@@ -131,8 +131,11 @@
       this.sun.position.set(c.x + Math.cos(sa) * 30, Math.max(8, Math.sin(sa) * 45 + 10), c.z + 18); this.sun.target.position.set(c.x, c.y, c.z);
       const box = RC.clamp(c.dist * 0.9, 18, 70), scam = this.sun.shadow.camera; if (scam.right !== box) { scam.left = scam.bottom = -box; scam.right = scam.top = box; scam.updateProjectionMatrix(); }
       // ---- weather
-      const wv = sim.weather; this.rain.visible = (wv === 'rain' || wv === 'storm'); this.snow.visible = wv === 'snow';
-      if (this.rain.visible) { this.rain.position.set(c.x, c.y, c.z); const p = this.rain.geometry.attributes.position; for (let j = 0; j < p.count; j += 2) { let y = p.getY(j) - dt * 22; if (y < 0) y += 25; p.setY(j, y); p.setY(j + 1, y - 0.5); p.setX(j + 1, p.getX(j) + this.shared.uWind.value.x * 4); } p.needsUpdate = true; }
+      // how much falls follows the sim's amounts: from a few drops to sheets of it, in waves
+      const pr = sim.precip || 0, sf = sim.snowfall || 0, nR = this.rain.geometry.attributes.position.count / 2, nS = this.snow.geometry.attributes.position.count;
+      this.rain.visible = pr > 0.01; this.snow.visible = sf > 0.01; this.rain.geometry.setDrawRange(0, Math.floor(nR * Math.min(1, pr * 1.1)) * 2); this.snow.geometry.setDrawRange(0, Math.floor(nS * sf));
+      this.rain.material.opacity = 0.25 + pr * 0.3;
+      if (this.rain.visible) { this.rain.position.set(c.x, c.y, c.z); const p = this.rain.geometry.attributes.position; for (let j = 0; j < p.count; j += 2) { let y = p.getY(j) - dt * (17 + pr * 9); if (y < 0) y += 25; p.setY(j, y); p.setY(j + 1, y - 0.5); p.setX(j + 1, p.getX(j) + this.shared.uWind.value.x * 0.35); p.setZ(j + 1, p.getZ(j) + this.shared.uWind.value.y * 0.35); } p.needsUpdate = true; }
       if (this.snow.visible) { this.snow.position.set(c.x, c.y, c.z); const p = this.snow.geometry.attributes.position; for (let j = 0; j < p.count; j++) { let y = p.getY(j) - dt * 1.6; if (y < 0) y += 25; p.setY(j, y); p.setX(j, p.getX(j) + Math.sin(t + j) * dt * 0.3); } p.needsUpdate = true; }
       sim.terrain.waterTex.offset.set(t * 0.012, t * 0.02);
       // ---- the cast
@@ -144,7 +147,7 @@
       this.cover.update(pl.x, pl.z); this.horizon.update(this.scene.fog.color, this.night);
       if (this.coverWx !== this.cover.group.children.length) { this.coverWx = this.cover.group.children.length; RC.weatherize(this.cover.group, this.shared); }   // (new grass chunks too)
       this.shared.uWet.value = sim.lying.wet; this.shared.uSnow.value = sim.lying.snow;
-      this.shared.uRain.value = RC.damp(this.shared.uRain.value, sim.weather === 'storm' ? 1 : sim.weather === 'rain' ? 0.7 : 0, 0.5, dt);
+      this.shared.uRain.value = RC.damp(this.shared.uRain.value, sim.precip != null ? sim.precip : sim.weather === 'storm' ? 1 : sim.weather === 'rain' ? 0.7 : 0, 0.5, dt);
       for (const fn of this.tickers) fn(t, { night: this.night, cam: this.cam, season: now.seasonIndex });
       if (this.bloom) { this.bloom.strength = 0.02 + this.night * 0.55; this.bloom.threshold = RC.lerp(1.6, 0.9, this.night); }   // (by day the sky must not glow)
       if (RC.settings.seeThrough === 'fade') this.fadeBlockers(pl);
