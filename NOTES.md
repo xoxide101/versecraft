@@ -53,3 +53,13 @@ wheel zoom, V view (close, Evo 2.5D, wide, whole map), R north, T +3 hours, G sk
 | `data/wrenhaven.js` | the town as data (made by `tools/from_arcadeevo.py` from ArcadeEvo's town, names swapped; edit freely) |
 | `lib/realm-libs.js` | three.js 0.186 in one plain script (`lib/build`: npm install, npm run build) |
 Not yet: interiors, the land beyond the gate, crafting, combat, music, drawing styles, custom models, more players.
+
+## Towns that grow (city-builder ideas)
+From the owner's SimCity 3000 modding days and Citybound (Anselm's open-source city sim; AGPL-3.0, so ideas only, no code):
+households with needs, plots that develop and change with land value, roads and services shaping growth, an economy of agents,
+a simulation that scales (detail rings). Other open-source city builders: check each licence before borrowing code.
+
+## Quality bar for art (2026-11-23)
+The owner's reference: rich hand-made detail like a full RPG tileset (walls, fences, stairs, furniture, market goods, interiors)
+and painted heroes, but in 3D and higher. Code-made models are the base; real quality comes from made models (GLB) dropped in by name:
+from 3DCraft, from CC0 kits (ask before downloading), or commissioned. References are ideas only, never copied assets.
