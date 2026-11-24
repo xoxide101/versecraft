@@ -9,6 +9,13 @@
 
   RC.Tex = {
     cv,
+    // a real texture (Poly Haven, packed in assets/tex/*.js): colour, relief and AO/roughness, tiled `rep` times; null if not packed
+    real(T, name, rep = 1) {
+      const d = (window.RC_TEX || {})[name]; if (!d) return null;
+      const key = 'real' + name + rep; if (cache[key]) return cache[key];
+      const L = new T.TextureLoader(), mk = (url, srgb) => { const tx = L.load(url); tx.wrapS = tx.wrapT = T.RepeatWrapping; tx.repeat.set(rep, rep); tx.anisotropy = 8; if (srgb) tx.colorSpace = T.SRGBColorSpace; return tx; };
+      return (cache[key] = { map: mk(d.map, true), normalMap: d.normal ? mk(d.normal) : null, arm: d.arm ? mk(d.arm) : null, meters: d.meters || [2, 2] });
+    },
     // a relief map from a height picture (brighter = higher), by comparing each pixel with its neighbours
     normalFrom(T, hc, strength = 2.5, repeat) {
       const w = hc.width, h = hc.height, src = hc.getContext('2d').getImageData(0, 0, w, h).data, out = cv(w, h), g = out.getContext('2d'), img = g.createImageData(w, h), d = img.data;

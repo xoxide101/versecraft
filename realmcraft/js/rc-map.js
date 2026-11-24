@@ -56,13 +56,17 @@
 
       // ---- piers: planks over '=' cells, posts at the corners
       const pierCells = []; for (let r = 0; r < realm.h; r++) for (let c = 0; c < realm.w; c++) if (terrain.paint[r][c] === '=') pierCells.push([c, r]);
-      const plank = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.1, 1), M('#9a6a3a'), pierCells.length), post = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.07, 1.2, 6), mats.darkWood, pierCells.length);
+      const pl = RC.Tex.real(THREE, 'planks_weathered'), plankM = pl ? M('#ffffff', { map: pl.map, normalMap: pl.normalMap, roughness: 0.9 }) : M('#9a6a3a');
+      const plank = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.1, 1), plankM, pierCells.length), post = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.07, 1.2, 6), mats.darkWood, pierCells.length);
       pierCells.forEach(([c, r], i) => { plank.setMatrixAt(i, tm.compose(ps.set(c + 0.5, terrain.pierY - 0.05, r + 0.5), q.identity(), sc.set(0.98, 1, 0.98))); post.setMatrixAt(i, tm.compose(ps.set(c + 0.05, terrain.pierY - 0.55, r + 0.05), q, sc.set(1, 1, 1))); });
       plank.receiveShadow = plank.castShadow = true; g.add(plank, post);
 
       // ---- buildings
       const surf = (k) => RC.Tex.surface(THREE, k);
-      const WT = { plaster: surf('plaster'), timber: surf('timber'), stone: surf('stone'), darkstone: surf('darkstone') }, RT = surf('roof');
+      const real = (n, fb) => { const x = RC.Tex.real(THREE, n); return x ? { map: x.map, normalMap: x.normalMap, arm: x.arm } : fb; };
+      const WT = { plaster: real('plaster', surf('plaster')), timber: surf('timber'), stone: real('stone_wall', surf('stone')), darkstone: real('castle_wall', surf('darkstone')) }, RT = surf('roof');
+      const ROOFT = { crimson: real('roof_clay', RT), terracotta: real('roof_clay', RT), cobalt: real('roof_slate', RT), emerald: real('roof_slate', RT) };
+      const ROOFTINT = { crimson: '#ffffff', terracotta: '#f0b090', cobalt: '#9fb4e6', emerald: '#9fd4b0' };
 
       const STYLE = {
         one_story_cottage: { wall: 'timber', h: 2.4, roof: 1.6 }, two_story_timber: { wall: 'timber', h: 3.8, roof: 1.8 }, smithery_foundry: { wall: 'darkstone', h: 2.8, roof: 1.4, bigChimney: true },
@@ -74,8 +78,10 @@
         const st = STYLE[b.style] || STYLE.one_story_cottage, grp = new THREE.Group(), fadeMats = [];
         const z0 = b.z + 0.5, z1 = b.z + b.d - 0.25, D = z1 - z0, cx = b.x + b.w / 2, cz = (z0 + z1) / 2, W = b.w - 0.3;
         const rep = (tx, x, y) => { const c = tx.clone(); c.needsUpdate = true; c.repeat.set(x, y); return c; };
-        const wallM = M('#ffffff', { map: rep(WT[st.wall].map, W / 2.6, st.h / 2.6), normalMap: rep(WT[st.wall].normalMap, W / 2.6, st.h / 2.6), roughness: 0.92 });
-        const roofM = M(ROOF[b.roof] || '#b4232a', { map: rep(RT.map, W / 2.2, 1.6), normalMap: rep(RT.normalMap, W / 2.2, 1.6), roughness: 0.75 }); fadeMats.push(wallM, roofM);
+        const wt = WT[st.wall], rt = ROOFT[b.roof] || RT, realRoof = rt !== RT;
+        const wallM = M('#ffffff', { map: rep(wt.map, W / 2.6, st.h / 2.6), normalMap: rep(wt.normalMap, W / 2.6, st.h / 2.6), roughness: 0.92 });
+        if (wt.arm) { wallM.roughnessMap = rep(wt.arm, W / 2.6, st.h / 2.6); wallM.roughness = 1; }
+        const roofM = M(realRoof ? ROOFTINT[b.roof] : ROOF[b.roof] || '#b4232a', { map: rep(rt.map, W / 2.2, 1.6), normalMap: rep(rt.normalMap, W / 2.2, 1.6), roughness: 0.75 }); fadeMats.push(wallM, roofM);
         grp.add(box(W, st.h, D, wallM));
         const rf = gable(W + 0.6, D + 0.8, st.roof, roofM); rf.position.y = st.h; grp.add(rf);
         grp.add(box(W + 0.2, 0.25, D + 0.2, mats.darkStone, 0, -0.05, 0));   // plinth

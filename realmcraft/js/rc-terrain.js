@@ -53,7 +53,7 @@
       for (let i = 0; i < p.count; i++) p.setY(i, this.surface(p.getX(i), p.getZ(i)));
       geo.computeVertexNormals();
       this.groundTex = this.paintTexture(THREE);
-      const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: this.groundTex, normalMap: this.groundNormal, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.93 }));
+      const ground = new THREE.Mesh(geo, this.groundMaterial(THREE));
       ground.receiveShadow = true; ground.name = 'ground'; g.add(ground);
       // water: one sheet over the sea, ripples drawn on it and drifting
       const wtex = this.rippleTexture(THREE); wtex.wrapS = wtex.wrapT = THREE.RepeatWrapping; wtex.repeat.set(W / 6, H / 6);
@@ -61,6 +61,56 @@
         new THREE.MeshStandardMaterial({ color: '#2f7fd1', map: wtex, transparent: true, opacity: 0.86, roughness: 0.25, metalness: 0.05 }));
       water.receiveShadow = true; water.name = 'water'; g.add(water); this.waterTex = wtex;
       return g;
+    }
+    // the ground's material: the painted grass picture, with real textures blended over it where the ground isn't grass
+    // (cobbles on roads, dirt where worn, forest floor under trees, sand and pebbles at the water), each with its own relief.
+    // A small "splat" picture says how much of each layer is where; its edges are ragged fractal, never cell squares.
+    groundMaterial(THREE) {
+      const base = new THREE.MeshStandardMaterial({ map: this.groundTex, normalMap: this.groundNormal, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.93 });
+      const L = ['cobble_road', 'dirt_path', 'forest_ground', 'sand'].map((n) => RC.Tex.real(THREE, n));
+      if (L.some((x) => !x)) return base;   // (textures not packed: the painted ground alone)
+      const splat = this.splatTexture(THREE), U = 1.1;   // (one world unit is about 1.1 m)
+      base.onBeforeCompile = (sh) => {
+        sh.uniforms.tSplat = { value: splat }; sh.uniforms.uSize = { value: new THREE.Vector2(this.w, this.h) };
+        L.forEach((x, i) => { sh.uniforms['tC' + i] = { value: x.map }; sh.uniforms['tN' + i] = { value: x.normalMap }; });
+        sh.uniforms.uScale = { value: new THREE.Vector4(...L.map((x) => U / x.meters[0])) };
+        sh.vertexShader = 'varying vec3 vWp;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vWp = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+        sh.fragmentShader = 'varying vec3 vWp; uniform sampler2D tSplat, tC0, tC1, tC2, tC3, tN0, tN1, tN2, tN3; uniform vec2 uSize; uniform vec4 uScale;\n' +
+          'vec2 luv(float s) { return vec2(vWp.x, -vWp.z) * s; }\n' +
+          sh.fragmentShader
+            .replace('#include <map_fragment>', `
+              vec4 sp = texture2D(tSplat, vWp.xz / uSize);
+              // sharpen where a layer's stones stand proud (a little height-based blending)
+              float h0 = dot(texture2D(tC0, luv(uScale.x)).rgb, vec3(0.33));
+              sp.r = clamp(sp.r * (0.75 + h0 * 0.8), 0.0, 1.0);
+              float wg = clamp(1.0 - sp.r - sp.g - sp.b - sp.a, 0.0, 1.0);
+              vec3 col = texture2D(map, vMapUv).rgb * wg + texture2D(tC0, luv(uScale.x)).rgb * sp.r + texture2D(tC1, luv(uScale.y)).rgb * sp.g + texture2D(tC2, luv(uScale.z)).rgb * sp.b + texture2D(tC3, luv(uScale.w)).rgb * sp.a;
+              diffuseColor.rgb *= col;`)
+            .replace('#include <normal_fragment_maps>', `
+              #ifdef USE_NORMALMAP_TANGENTSPACE
+              vec3 mapN = (texture2D(normalMap, vNormalMapUv).xyz * 2.0 - 1.0) * wg + (texture2D(tN0, luv(uScale.x)).xyz * 2.0 - 1.0) * sp.r * 1.4 + (texture2D(tN1, luv(uScale.y)).xyz * 2.0 - 1.0) * sp.g + (texture2D(tN2, luv(uScale.z)).xyz * 2.0 - 1.0) * sp.b + (texture2D(tN3, luv(uScale.w)).xyz * 2.0 - 1.0) * sp.a;
+              mapN.z = max(mapN.z, 0.2); mapN.xy *= normalScale;
+              normal = normalize(tbn * mapN);
+              #endif`);
+      };
+      base.customProgramCacheKey = () => 'ground-splat';
+      return base;
+    }
+    // the splat picture: R cobbles, G dirt, B forest floor, A sand and shore
+    splatTexture(THREE) {
+      const S = 8, W = this.w, H = this.h, cv = RC.Tex.cv(W * S, H * S), g = cv.getContext('2d'), img = g.createImageData(W * S, H * S), d = img.data;
+      for (let y = 0; y < H * S; y++) for (let x = 0; x < W * S; x++) {
+        const wx = (x + 0.5) / S, wz = (y + 0.5) / S, i = (y * W * S + x) * 4;
+        const road = this.soft('-', wx, wz), under = this.soft('T', wx, wz), water = Math.max(this.soft('~', wx, wz), this.soft('=', wx, wz));
+        const cob = RC.smooth01((road - 0.42 + (RC.fbm(wx, wz, 0.8, 3, 33) - 0.5) * 0.3) / 0.12);
+        const kept = this.kept ? this.kept(wx, wz) : 0, worn = this.worn ? this.worn(wx, wz) : 0;
+        let dirt = RC.smooth01((RC.fbm(wx + 31, wz + 17, 3.2, 5, 5) - 0.6 + worn * 0.35 - kept * 0.12) / 0.08) * (1 - cob);
+        const forest = RC.smooth01((under - 0.3) / 0.4) * (1 - cob) * 0.85, sand = RC.smooth01((water - 0.2) / 0.35) * (1 - cob);
+        dirt *= 1 - forest; const sum = cob + dirt + forest + sand, k = sum > 1 ? 1 / sum : 1;
+        d[i] = cob * k * 255; d[i + 1] = dirt * k * 255; d[i + 2] = forest * k * 255; d[i + 3] = sand * k * 255;
+      }
+      g.putImageData(img, 0, 0);
+      const tx = new THREE.CanvasTexture(cv); tx.premultiplyAlpha = false; tx.colorSpace = THREE.NoColorSpace; tx.minFilter = THREE.LinearFilter; tx.generateMipmaps = false; return tx;
     }
     // the ground picture: P pixels per cell, each letter painted its own way, plus a height picture for relief
     paintTexture(THREE) {

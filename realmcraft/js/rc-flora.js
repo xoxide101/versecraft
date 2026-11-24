@@ -181,7 +181,10 @@
       mat.customProgramCacheKey = () => 'sway' + strength + flutter + base; return mat;
     };
     const leafMat = (kind, strength) => { const map = RC.Tex.leaves(T, kind); const m = sway(new T.MeshStandardMaterial({ map, alphaTest: 0.42, side: T.DoubleSide, vertexColors: true, roughness: 0.72, metalness: 0 }), strength); m.userData.depth = new T.MeshDepthMaterial({ map, alphaTest: 0.42, depthPacking: T.RGBADepthPacking }); return m; };
-    const barkMat = (kind) => { const b = RC.Tex.bark(T, kind); const m = new T.MeshStandardMaterial({ map: b.map, normalMap: b.normalMap, roughness: 0.95 }); m.map.repeat.set(2, 1); m.normalMap.repeat.set(2, 1); return m; };
+    const barkMat = (kind) => {   // real bark where packed (oak, maple, fruit: brown bark; pine: pine bark); birch keeps its drawn white bark
+      const realName = { oak: 'bark_brown', maple: 'bark_brown', fruit: 'bark_brown', pine: 'bark_pine' }[kind], rb = realName && RC.Tex.real(T, realName);
+      const b = rb ? { map: rb.map.clone(), normalMap: rb.normalMap.clone() } : RC.Tex.bark(T, kind); b.map.needsUpdate = b.normalMap.needsUpdate = true;
+      const m = new T.MeshStandardMaterial({ map: b.map, normalMap: b.normalMap, normalScale: new T.Vector2(1.4, 1.4), roughness: 0.95 }); m.map.repeat.set(rb ? 1 : 2, rb ? 0.5 : 1); m.normalMap.repeat.copy(m.map.repeat); return m; };
     const fillMat = (kind, strength = 0.04) => { const map = RC.Tex.leaves(T, kind, true); return sway(new T.MeshStandardMaterial({ map, vertexColors: true, roughness: 0.85 }), strength, false); };
     return { leafMat, barkMat, fillMat, sway };
   };
@@ -241,7 +244,7 @@
     if (gm) brush.grass.forEach(([x, z], i) => { const c = Math.floor(x), r = Math.floor(z), patch = noise(c, r, 5) * 0.6 + noise(c, r, 2) * 0.4, meadow = at(c, r) === ','; gm.setColorAt(i, col.setHSL((meadow ? 92 : 98 + patch * 10) / 360, (meadow ? 46 : 44 + patch * 10) / 100, ((meadow ? 50 : 40) + patch * 10) / 100 + 0.1)); });
     const reedMat = mats.sway(new T.MeshStandardMaterial({ map: RC.Tex.leaves(T, 'reed'), alphaTest: 0.4, side: T.DoubleSide, roughness: 0.9 }), 0.2, true, 0);
     if (!RC.GroundCover) plantSet(brush.reed, crossed(0.7, 1.2, 3), reedMat, [0.8, 1.3], '#ffffff');
-    const stone = RC.Tex.surface(T, 'rock'); const rockMat = new T.MeshStandardMaterial({ vertexColors: true, map: stone.map, normalMap: stone.normalMap, roughness: 0.95 });
+    const stone = RC.Tex.real(T, 'rock_mossy') || RC.Tex.surface(T, 'rock'); const rockMat = new T.MeshStandardMaterial({ vertexColors: true, map: stone.map, normalMap: stone.normalMap, normalScale: new T.Vector2(1.5, 1.5), roughness: 0.95 });
     plantSet(brush.rock, RC.Flora.rock(T, 4), rockMat, [0.45, 1.1], '#ffffff');
     // seasons: recolour leaves when the season turns; bare branches in winter
     let lastSeason = -1;
