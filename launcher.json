@@ -1,0 +1,9 @@
+{
+ "name": "VerseCraft",
+ "icon": "🌌",
+ "about": "Story engine: Workbench, StoryCraft, TaleCraft, RealmCraft",
+ "group": "Play and stories",
+ "order": 10,
+ "entry": "realmcraft/index.html",
+ "status": "alpha"
+}
